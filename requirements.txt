@@ -1,0 +1,6 @@
+flask
+flask-cors
+requests
+yt-dlp
+google-genai
+gunicorn
