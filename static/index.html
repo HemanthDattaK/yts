@@ -2,467 +2,777 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>VidAI — YouTube Intelligence</title>
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>VIDE — Search less. Understand more.</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
   :root {
-    --bg:        #f5f0eb;
-    --sidebar:   #ede8e1;
-    --surface:   #ffffff;
-    --border:    #ddd8d0;
-    --text:      #2c2825;
-    --muted:     #8a8278;
-    --accent:    #c96a2e;
-    --accent2:   #7c5cbf;
-    --user-bg:   #2c2825;
-    --user-text: #f5f0eb;
-    --ai-bg:     #ffffff;
-    --ai-border: #ddd8d0;
-    --shadow:    0 2px 12px rgba(44,40,37,.08);
-    --radius:    16px;
-    --tag-bg:    #ede8e1;
-    --success:   #1a6b2f;
-    --success-bg:#d4edda;
-    --warn-bg:   #fff3cd;
-    --warn:      #856404;
-    --err-bg:    #f8d7da;
-    --err:       #721c24;
-    --step-done: #c96a2e;
-    --step-active:#2c2825;
-    --step-wait: #c5bdb3;
-  }
-  [data-theme="dark"] {
-    --bg:        #1a1816;
-    --sidebar:   #141210;
-    --surface:   #222018;
-    --border:    #333028;
-    --text:      #e8e2d9;
-    --muted:     #7a7268;
-    --accent:    #e07d3c;
-    --accent2:   #9b7de0;
-    --user-bg:   #e8e2d9;
-    --user-text: #1a1816;
-    --ai-bg:     #222018;
-    --ai-border: #333028;
-    --shadow:    0 2px 12px rgba(0,0,0,.3);
-    --tag-bg:    #2a2820;
-    --success-bg:#0d2e15;
-    --success:   #4caf70;
-    --warn-bg:   #2e2600;
-    --warn:      #d4a017;
-    --err-bg:    #2e0a0d;
-    --err:       #e07080;
-    --step-done: #e07d3c;
-    --step-active:#e8e2d9;
-    --step-wait: #444038;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:'DM Sans',sans-serif;
-    background:var(--bg);color:var(--text);
-    display:flex;height:100vh;overflow:hidden;
-    transition:background .3s,color .3s;
+    --bg:         #0d0f14;
+    --surface:    #14171f;
+    --surface2:   #1c202b;
+    --border:     #252933;
+    --text:       #e8eaf0;
+    --muted:      #5c6278;
+    --subtle:     #3a3f52;
+    --accent:     #6c63ff;
+    --accent2:    #ff6b6b;
+    --accent3:    #00d4aa;
+    --user-bg:    #6c63ff;
+    --user-text:  #ffffff;
+    --shadow:     0 4px 24px rgba(0,0,0,.4);
+    --radius:     18px;
+    --radius-sm:  10px;
+    --success:    #00d4aa;
+    --success-bg: rgba(0,212,170,.1);
+    --warn:       #f5a623;
+    --warn-bg:    rgba(245,166,35,.1);
+    --err:        #ff6b6b;
+    --err-bg:     rgba(255,107,107,.1);
   }
 
-  /* ── Sidebar ── */
-  #sidebar{
-    width:260px;min-width:260px;
-    background:var(--sidebar);
-    border-right:1px solid var(--border);
-    display:flex;flex-direction:column;
-    padding:20px 16px;gap:16px;
-    overflow-y:auto;transition:background .3s;
+  [data-theme="light"] {
+    --bg:         #f7f8fc;
+    --surface:    #ffffff;
+    --surface2:   #f0f1f7;
+    --border:     #e2e4ed;
+    --text:       #1a1b26;
+    --muted:      #8b8fa8;
+    --subtle:     #c4c6d6;
+    --accent:     #6c63ff;
+    --accent2:    #ff6b6b;
+    --accent3:    #00b894;
+    --user-bg:    #6c63ff;
+    --user-text:  #ffffff;
+    --shadow:     0 4px 24px rgba(0,0,0,.08);
+    --success:    #00b894;
+    --success-bg: rgba(0,184,148,.1);
+    --warn:       #e67e22;
+    --warn-bg:    rgba(230,126,34,.1);
+    --err:        #e55353;
+    --err-bg:     rgba(229,83,83,.1);
   }
-  .sidebar-header{
-    display:flex;align-items:center;justify-content:space-between;
-    padding-bottom:12px;border-bottom:1px solid var(--border);
-  }
-  .logo{font-family:'Lora',serif;font-size:1.4rem;font-weight:600;color:var(--accent);letter-spacing:-.5px;}
-  .logo span{color:var(--text)}
-  #themeBtn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.2rem;padding:4px;border-radius:8px;transition:background .2s;}
-  #themeBtn:hover{background:var(--border)}
-  .sidebar-section{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:4px;}
-  label.field-label{font-size:.8rem;color:var(--muted);font-weight:500;display:block;margin-bottom:4px;}
-  select,input[type=number]{
-    width:100%;padding:8px 10px;
-    background:var(--surface);border:1px solid var(--border);
-    border-radius:10px;color:var(--text);
-    font-family:'DM Sans',sans-serif;font-size:.88rem;
-    outline:none;transition:border .2s;
-  }
-  select:focus,input[type=number]:focus{border-color:var(--accent)}
-  .new-chat-btn{
-    width:100%;padding:10px;background:var(--accent);color:#fff;
-    border:none;border-radius:12px;font-family:'DM Sans',sans-serif;
-    font-size:.9rem;font-weight:500;cursor:pointer;transition:opacity .2s;
-  }
-  .new-chat-btn:hover{opacity:.88}
-  #historyList{display:flex;flex-direction:column;gap:6px;}
-  .history-item{
-    padding:8px 10px;border-radius:10px;background:var(--surface);
-    border:1px solid var(--border);cursor:pointer;
-    font-size:.82rem;color:var(--text);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    transition:background .15s;
-  }
-  .history-item:hover{background:var(--border)}
-  .history-item.active{border-color:var(--accent);color:var(--accent)}
 
-  /* ── Main ── */
-  #main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-  #messages{
-    flex:1;overflow-y:auto;padding:32px 20px 16px;
-    display:flex;flex-direction:column;gap:20px;scroll-behavior:smooth;
-  }
-  #messages::-webkit-scrollbar{width:6px}
-  #messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  .welcome{text-align:center;margin:auto;max-width:520px;padding:40px 20px;}
-  .welcome h1{font-family:'Lora',serif;font-size:2rem;font-weight:600;color:var(--text);margin-bottom:10px;}
-  .welcome p{color:var(--muted);font-size:.95rem;line-height:1.6}
-  .welcome .accent{color:var(--accent)}
+  html, body {
+    height: 100%;
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    transition: background .25s, color .25s;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* ── Layout Shell ── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* ── Top Bar ── */
+  #topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    user-select: none;
+  }
+  .brand-main {
+    font-size: 1.25rem;
+    color: var(--text);
+    line-height: 1;
+  }
+  .brand-sub {
+    font-size: .92rem;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .theme-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .2s, color .2s, background .2s;
+    flex-shrink: 0;
+  }
+  .theme-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+
+  .lang-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: .82rem;
+    padding: 7px 12px;
+    border-radius: 30px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color .2s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235c6278' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+  .lang-select:focus { border-color: var(--accent); }
+
+  /* ── Messages Area ── */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+  }
+  #messages::-webkit-scrollbar { width: 4px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+  /* ── Welcome ── */
+  .welcome {
+    text-align: center;
+    margin: auto;
+    padding: 40px 20px;
+    max-width: 480px;
+  }
+  .welcome-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    display: block;
+    filter: drop-shadow(0 0 24px rgba(108,99,255,.5));
+  }
+  .welcome h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.4rem, 4vw, 1.9rem);
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    color: var(--text);
+  }
+  .welcome h1 em { color: var(--accent); font-style: normal; }
+  .welcome p {
+    color: var(--muted);
+    font-size: .9rem;
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+  .welcome-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .welcome-chip {
+    padding: 6px 14px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+    font-size: .78rem;
+    color: var(--muted);
+    background: var(--surface);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .welcome-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(108,99,255,.08);
+  }
 
   /* ── Message bubbles ── */
-  .msg{display:flex;gap:12px;max-width:820px;width:100%;margin:0 auto;}
-  .msg.user{flex-direction:row-reverse}
-  .avatar{
-    width:34px;height:34px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    font-size:.85rem;font-weight:600;flex-shrink:0;margin-top:2px;
-  }
-  .msg.ai .avatar{background:var(--accent);color:#fff}
-  .msg.user .avatar{background:var(--user-bg);color:var(--user-text)}
-  .bubble{
-    padding:14px 18px;border-radius:var(--radius);
-    line-height:1.65;font-size:.93rem;
-    max-width:calc(100% - 46px);
-  }
-  .msg.user .bubble{background:var(--user-bg);color:var(--user-text);border-bottom-right-radius:4px;}
-  .msg.ai .bubble{background:var(--ai-bg);color:var(--text);border:1px solid var(--ai-border);border-bottom-left-radius:4px;box-shadow:var(--shadow);}
-  .bubble h2,.bubble h3{font-family:'Lora',serif;margin:14px 0 6px;color:var(--accent);}
-  .bubble h2{font-size:1.1rem}
-  .bubble h3{font-size:.98rem}
-  .bubble p{margin-bottom:8px}
-  .bubble ul,.bubble ol{padding-left:18px;margin-bottom:8px}
-  .bubble li{margin-bottom:4px}
-  .bubble strong{font-weight:600}
-  .bubble code{background:var(--tag-bg);padding:1px 6px;border-radius:5px;font-size:.85rem;}
+  .msg { display: flex; gap: 10px; animation: fadeUp .3s ease; }
+  .msg.user { flex-direction: row-reverse; }
 
-  /* ── PROGRESS PANEL ── */
-  .progress-panel{
-    background:var(--surface);border:1px solid var(--border);
-    border-radius:var(--radius);padding:16px 18px;
-    box-shadow:var(--shadow);
-    max-width:calc(100% - 46px);
-    width:100%;
-  }
-  .progress-title{
-    font-size:.8rem;font-weight:600;text-transform:uppercase;
-    letter-spacing:.06em;color:var(--muted);margin-bottom:12px;
-  }
-  .steps-list{display:flex;flex-direction:column;gap:8px;}
-  .step{
-    display:flex;align-items:flex-start;gap:10px;
-    font-size:.88rem;padding:8px 10px;border-radius:10px;
-    transition:background .2s,color .2s;
-  }
-  .step.done{background:var(--success-bg);color:var(--success);}
-  .step.active{background:var(--warn-bg);color:var(--warn);}
-  .step.error{background:var(--err-bg);color:var(--err);}
-  .step.waiting{color:var(--step-wait);}
-  .step-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
-  .step-body{flex:1;}
-  .step-label{font-weight:600;line-height:1.3;}
-  .step-detail{font-size:.78rem;opacity:.8;margin-top:2px;line-height:1.4;}
-
-  /* progress bar inside step */
-  .step-progress{
-    height:4px;background:var(--border);border-radius:99px;
-    margin-top:6px;overflow:hidden;
-  }
-  .step-progress-bar{
-    height:100%;background:var(--accent);border-radius:99px;
-    transition:width .4s ease;
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* active step spinner */
-  .step-spinner{
-    display:inline-block;width:14px;height:14px;
-    border:2px solid rgba(133,100,4,.3);
-    border-top-color:var(--warn);
-    border-radius:50%;animation:spin .7s linear infinite;
-    flex-shrink:0;margin-top:2px;
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .72rem; font-weight: 700;
+    flex-shrink: 0; margin-top: 2px;
   }
-  .step.active .step-icon{ display:none; }
-  .step-spinner-wrap{ display:none; flex-shrink:0; }
-  .step.active .step-spinner-wrap{ display:flex; }
-  @keyframes spin{to{transform:rotate(360deg)}}
+  .msg.ai .avatar { background: var(--accent); color: #fff; }
+  .msg.user .avatar { background: var(--user-bg); color: var(--user-text); }
 
-  /* ── Video cards ── */
-  .videos-header{font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:8px;}
-  .videos-row{display:flex;flex-direction:column;gap:8px;}
-  .video-card{
-    background:var(--tag-bg);border:1px solid var(--border);
-    border-radius:12px;overflow:hidden;
-    transition:box-shadow .2s,border-color .2s;
+  .bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    line-height: 1.65;
+    font-size: .9rem;
+    max-width: calc(100% - 44px);
   }
-  .video-card:hover{border-color:var(--accent);box-shadow:var(--shadow)}
-  .vc-top{display:flex;gap:10px;padding:10px;text-decoration:none;color:var(--text);}
-  .vc-top img{width:100px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;}
-  .vc-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;}
-  .vc-title{font-size:.82rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;}
-  .vc-meta{font-size:.73rem;color:var(--muted)}
-  .vc-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
-  .vc-badge{font-size:.65rem;padding:3px 8px;border-radius:99px;font-weight:600;white-space:nowrap;}
-  .vc-badge.ready{background:var(--success-bg);color:var(--success)}
-  .vc-badge.processing{background:var(--warn-bg);color:var(--warn)}
-  .vc-badge.error{background:var(--err-bg);color:var(--err)}
-  .vc-transcript-btn{
-    font-size:.7rem;padding:3px 9px;border-radius:8px;
-    border:1px solid var(--border);background:var(--surface);
-    color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;
-    transition:all .15s;white-space:nowrap;
+  .msg.user .bubble {
+    background: var(--user-bg);
+    color: var(--user-text);
+    border-bottom-right-radius: 4px;
   }
-  .vc-transcript-btn:hover{border-color:var(--accent2);color:var(--accent2)}
-  .vc-transcript-panel{
-    display:none;padding:0 10px 10px;
-    border-top:1px solid var(--border);margin-top:-2px;
+  .msg.ai .bubble {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+    box-shadow: var(--shadow);
+    width: 100%;
   }
-  .vc-transcript-panel.open{display:block;}
-  .vc-transcript-inner{
-    max-height:180px;overflow-y:auto;
-    font-size:.8rem;line-height:1.6;color:var(--muted);
-    padding:10px;background:var(--surface);
-    border-radius:8px;margin-top:8px;
-    white-space:pre-wrap;word-break:break-word;
-  }
-  .vc-transcript-inner::-webkit-scrollbar{width:4px}
-  .vc-transcript-inner::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
 
-  /* ── Add more videos bar ── */
-  .add-videos-bar{
-    display:flex;align-items:center;gap:10px;
-    padding:10px 14px;
-    background:var(--tag-bg);border:1px dashed var(--border);
-    border-radius:12px;margin-top:4px;
+  /* md styles */
+  .bubble p { margin-bottom: 8px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .bubble ul, .bubble ol { padding-left: 16px; margin-bottom: 8px; }
+  .bubble li { margin-bottom: 4px; }
+  .bubble strong { font-weight: 600; color: var(--text); }
+  .bubble code { background: var(--surface2); padding: 2px 6px; border-radius: 5px; font-size: .83rem; }
+  .md-h2 { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; color: var(--accent); margin: 14px 0 6px; }
+  .md-h3 { font-family: 'Syne', sans-serif; font-size: .9rem; font-weight: 600; color: var(--accent3); margin: 10px 0 4px; }
+
+  /* ── Progress Panel ── */
+  .progress-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    width: 100%;
   }
-  .add-videos-bar input{
-    flex:1;border:none;outline:none;background:transparent;
-    font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--text);
-    padding:2px 0;
+  .progress-title {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin-bottom: 12px;
   }
-  .add-videos-bar input::placeholder{color:var(--muted)}
-  .add-videos-btn{
-    padding:6px 14px;border-radius:8px;
-    background:var(--accent2);color:#fff;
-    border:none;cursor:pointer;font-size:.82rem;font-weight:500;
-    font-family:'DM Sans',sans-serif;transition:opacity .2s;white-space:nowrap;
+  .steps-list { display: flex; flex-direction: column; gap: 6px; }
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    font-size: .85rem;
+    transition: background .2s;
   }
-  .add-videos-btn:hover{opacity:.85}
-  .add-videos-btn:disabled{opacity:.4;cursor:not-allowed}
+  .step.done   { background: var(--success-bg); color: var(--success); }
+  .step.active { background: var(--warn-bg); color: var(--warn); }
+  .step.error  { background: var(--err-bg); color: var(--err); }
+  .step.waiting { color: var(--subtle); }
+  .step-icon { font-size: .9rem; flex-shrink: 0; margin-top: 1px; }
+  .step-body { flex: 1; }
+  .step-label { font-weight: 600; line-height: 1.3; }
+  .step-detail { font-size: .75rem; opacity: .8; margin-top: 2px; }
+
+  .step-spinner-wrap { display: none; flex-shrink: 0; }
+  .step.active .step-spinner-wrap { display: flex; }
+  .step.active .step-icon { display: none; }
+  .step-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(245,166,35,.25);
+    border-top-color: var(--warn);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Video Card ── */
+  .video-section { width: 100%; }
+  .video-section-label {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .video-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .video-card:hover { border-color: var(--accent); }
+  .vc-main {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .vc-thumb {
+    width: 96px; height: 58px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  .vc-info { flex: 1; min-width: 0; }
+  .vc-title {
+    font-size: .82rem;
+    font-weight: 600;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .vc-meta { font-size: .72rem; color: var(--muted); }
+  .vc-badge {
+    font-size: .65rem;
+    padding: 3px 9px;
+    border-radius: 30px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-left: auto;
+    align-self: flex-start;
+    flex-shrink: 0;
+  }
+  .vc-badge.processing { background: var(--warn-bg); color: var(--warn); }
+  .vc-badge.ready      { background: var(--success-bg); color: var(--success); }
+  .vc-badge.error      { background: var(--err-bg); color: var(--err); }
+  .vc-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0 12px 12px;
+    flex-wrap: wrap;
+  }
+  .vc-btn {
+    font-size: .72rem;
+    padding: 5px 12px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    text-decoration: none;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .vc-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .vc-btn.transcript:hover { border-color: var(--accent3); color: var(--accent3); }
+  .vc-transcript-panel {
+    display: none;
+    padding: 0 12px 12px;
+  }
+  .vc-transcript-panel.open { display: block; }
+  .vc-transcript-inner {
+    max-height: 160px;
+    overflow-y: auto;
+    font-size: .78rem;
+    line-height: 1.6;
+    color: var(--muted);
+    padding: 10px;
+    background: var(--surface);
+    border-radius: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid var(--border);
+  }
+  .vc-transcript-inner::-webkit-scrollbar { width: 3px; }
+  .vc-transcript-inner::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 
   /* ── Answer actions ── */
-  .answer-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
-  .action-btn{
-    padding:5px 12px;border-radius:8px;border:1px solid var(--border);
-    background:var(--tag-bg);color:var(--muted);font-size:.78rem;font-weight:500;
-    cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;
+  .answer-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
   }
-  .action-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .act-btn {
+    padding: 6px 14px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: .77rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'Outfit', sans-serif;
+    transition: all .15s;
+  }
+  .act-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .act-btn.followup:hover { border-color: var(--accent3); color: var(--accent3); }
 
-  /* cursor blink */
-  .cursor{display:inline-block;width:2px;height:1em;background:var(--accent);margin-left:2px;vertical-align:text-bottom;animation:blink .7s step-end infinite;}
-  @keyframes blink{50%{opacity:0}}
+  /* cursor */
+  .cursor {
+    display: inline-block;
+    width: 2px; height: 1em;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink .7s step-end infinite;
+    border-radius: 1px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
 
-  /* ── Input bar ── */
-  #inputBar{padding:16px 20px 20px;border-top:1px solid var(--border);background:var(--bg);}
-  #inputWrap{
-    max-width:820px;margin:0 auto;background:var(--surface);
-    border:1.5px solid var(--border);border-radius:18px;
-    box-shadow:var(--shadow);transition:border-color .2s;overflow:hidden;
+  /* ── Thinking indicator ── */
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .82rem;
+    color: var(--muted);
+    padding: 10px 0 4px;
   }
-  #inputWrap:focus-within{border-color:var(--accent)}
-
-  /* mode toggle */
-  .mode-tabs{
-    display:flex;align-items:center;gap:0;
-    padding:8px 14px 0;border-bottom:1px solid var(--border);
+  .thinking-dots span {
+    display: inline-block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: bounce 1.2s ease-in-out infinite;
+    opacity: .5;
   }
-  .mode-tab{
-    padding:5px 12px;font-size:.78rem;font-weight:500;
-    border-radius:8px 8px 0 0;cursor:pointer;color:var(--muted);
-    background:none;border:none;font-family:'DM Sans',sans-serif;
-    transition:color .2s,background .2s;
-    position:relative;bottom:-1px;border:1px solid transparent;
-  }
-  .mode-tab.active{
-    color:var(--accent);border-color:var(--border);
-    border-bottom-color:var(--surface);background:var(--surface);
+  .thinking-dots span:nth-child(2) { animation-delay: .2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: .5; }
+    40% { transform: translateY(-5px); opacity: 1; }
   }
 
-  #topicRow{display:flex;align-items:center;padding:8px 14px 0;gap:8px;}
-  #topicLabel{font-size:.72rem;color:var(--muted);font-weight:500;white-space:nowrap;}
-  #topicInput{
-    flex:1;border:none;outline:none;background:transparent;
-    font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--text);padding:6px 0;
+  /* ── Input Bar ── */
+  #inputBar {
+    padding: 12px 16px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
   }
-  #topicInput::placeholder{color:var(--muted)}
-  #topicRow.hidden{display:none;}
 
-  #divider{height:1px;background:var(--border);margin:0 14px}
-  #questionRow{display:flex;align-items:flex-end;padding:6px 14px 10px;gap:8px;}
-  #questionInput{
-    flex:1;border:none;outline:none;background:transparent;
-    font-family:'DM Sans',sans-serif;font-size:.93rem;color:var(--text);
-    resize:none;min-height:28px;max-height:120px;line-height:1.5;padding:4px 0;
+  /* mode tabs */
+  .mode-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    background: var(--surface);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
   }
-  #questionInput::placeholder{color:var(--muted)}
-  #sendBtn{
-    width:38px;height:38px;border-radius:12px;background:var(--accent);color:#fff;
-    border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
-    flex-shrink:0;transition:opacity .2s;font-size:1rem;
+  .mode-tab {
+    flex: 1;
+    padding: 7px 10px;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Outfit', sans-serif;
+    font-size: .8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
   }
-  #sendBtn:disabled{opacity:.4;cursor:not-allowed}
-  #sendBtn:not(:disabled):hover{opacity:.85}
-  .hint{text-align:center;font-size:.72rem;color:var(--muted);margin-top:8px;max-width:820px;margin-left:auto;margin-right:auto;}
+  .mode-tab.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(108,99,255,.35);
+  }
 
-  /* mode indicator in input */
-  .followup-note{
-    padding:6px 14px 0;font-size:.75rem;color:var(--accent2);font-weight:500;
+  /* input box */
+  #inputBox {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color .2s;
+    overflow: hidden;
   }
-  .followup-note span{opacity:.7}
+  #inputBox:focus-within { border-color: var(--accent); }
 
-  /* md helpers */
-  .md-h2{font-family:'Lora',serif;font-size:1.05rem;font-weight:600;color:var(--accent);margin:14px 0 5px}
-  .md-h3{font-family:'Lora',serif;font-size:.95rem;font-weight:600;color:var(--accent2);margin:10px 0 4px}
-  .md-p{margin-bottom:7px;line-height:1.65}
-  .md-li{margin-bottom:3px;line-height:1.55}
-  .md-bold{font-weight:600}
+  .topic-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px 0;
+    gap: 8px;
+  }
+  .topic-label {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  #topicInput {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'Outfit', sans-serif;
+    font-size: .88rem;
+    color: var(--text);
+    padding: 6px 0;
+  }
+  #topicInput::placeholder { color: var(--muted); }
+
+  .followup-note {
+    padding: 10px 14px 0;
+    font-size: .78rem;
+    color: var(--accent3);
+    font-weight: 500;
+    display: none;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 8px 14px 0; }
+
+  .question-row {
+    display: flex;
+    align-items: flex-end;
+    padding: 6px 12px 10px;
+    gap: 8px;
+  }
+  #questionInput {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'Outfit', sans-serif;
+    font-size: .9rem;
+    color: var(--text);
+    resize: none;
+    min-height: 28px;
+    max-height: 120px;
+    line-height: 1.5;
+    padding: 4px 0;
+  }
+  #questionInput::placeholder { color: var(--muted); }
+
+  #sendBtn {
+    width: 38px; height: 38px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1rem;
+    transition: opacity .2s, transform .1s;
+    box-shadow: 0 2px 12px rgba(108,99,255,.4);
+  }
+  #sendBtn:not(:disabled):hover { opacity: .88; transform: scale(1.04); }
+  #sendBtn:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
+
+  .hint {
+    text-align: center;
+    font-size: .7rem;
+    color: var(--subtle);
+    margin-top: 8px;
+  }
+
+  /* ── Follow-up bar ── */
+  .followup-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    width: 100%;
+    margin-top: 2px;
+  }
+  .followup-bar-label {
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--accent3);
+    margin-bottom: 6px;
+  }
+  .followup-bar-hint {
+    font-size: .8rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* error / success */
+  .toast {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: .85rem;
+    font-weight: 500;
+  }
+  .toast.err { background: var(--err-bg); color: var(--err); }
+  .toast.ok  { background: var(--success-bg); color: var(--success); }
+
+  /* ── Wider Desktop Support ── */
+  @media (min-width: 900px) {
+    #messages {
+      padding: 30px 60px;
+    }
+    .msg.ai .bubble,
+    .msg.user .bubble {
+      max-width: 900px;
+    }
+    .welcome {
+      max-width: 620px;
+    }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    #topbar { padding: 12px 14px 10px; }
+    #messages { padding: 14px 12px; gap: 12px; }
+    #inputBar { padding: 10px 12px 14px; }
+    .vc-thumb { width: 76px; height: 46px; }
+    .bubble { font-size: .88rem; }
+    .mode-tab { font-size: .74rem; padding: 6px 8px; }
+    .brand-main { font-size: 1.1rem; }
+    .brand-sub { font-size: .82rem; }
+  }
+
+  @media (min-width: 760px) {
+    #app {
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+  }
 </style>
 </head>
 <body>
+<div id="app">
 
-<!-- ═══ SIDEBAR ═══ -->
-<aside id="sidebar">
-  <div class="sidebar-header">
-    <div class="logo">Vid<span>AI</span></div>
-    <button id="themeBtn" title="Toggle theme">🌙</button>
-  </div>
-
-  <button class="new-chat-btn" onclick="newChat()">+ New Search</button>
-
-  <div>
-    <div class="sidebar-section">Settings</div>
-    <br/>
-    <label class="field-label">Number of videos</label>
-    <input type="number" id="numVideos" min="1" max="10" value="2"/>
-    <br/><br/>
-    <label class="field-label">Output language</label>
-    <select id="langSelect">
-      <option value="English">English</option>
-      <option value="Hindi">Hindi</option>
-      <option value="Telugu">Telugu</option>
-      <option value="Tamil">Tamil</option>
-      <option value="Kannada">Kannada</option>
-      <option value="Malayalam">Malayalam</option>
-      <option value="Bengali">Bengali</option>
-      <option value="Marathi">Marathi</option>
-      <option value="Gujarati">Gujarati</option>
-      <option value="Spanish">Spanish</option>
-      <option value="French">French</option>
-      <option value="German">German</option>
-      <option value="Japanese">Japanese</option>
-      <option value="Chinese">Chinese</option>
-    </select>
-  </div>
-
-  <div>
-    <div class="sidebar-section">Session Info</div>
-    <br/>
-    <div id="sessionInfo" style="font-size:.78rem;color:var(--muted);line-height:1.6;">
-      No active session
+  <!-- Top Bar -->
+  <header id="topbar">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="brand" aria-label="VIDE AI">
+        <span class="brand-main">VIDE</span>
+        <span class="brand-sub">AI</span>
+      </div>
+      <select class="lang-select" id="langSelect">
+        <option value="English">🌐 English</option>
+        <option value="Hindi">हिं Hindi</option>
+        <option value="Telugu">తె Telugu</option>
+        <option value="Tamil">த Tamil</option>
+        <option value="Kannada">ಕ Kannada</option>
+        <option value="Malayalam">മ Malayalam</option>
+        <option value="Bengali">বা Bengali</option>
+        <option value="Marathi">म Marathi</option>
+        <option value="Gujarati">ગ Gujarati</option>
+        <option value="Spanish">🇪🇸 Spanish</option>
+        <option value="French">🇫🇷 French</option>
+        <option value="German">🇩🇪 German</option>
+        <option value="Japanese">🇯🇵 Japanese</option>
+        <option value="Chinese">🇨🇳 Chinese</option>
+      </select>
     </div>
-  </div>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+  </header>
 
-  <div>
-    <div class="sidebar-section">History</div>
-    <br/>
-    <div id="historyList"><p style="font-size:.8rem;color:var(--muted)">No searches yet</p></div>
-  </div>
-</aside>
-
-<!-- ═══ MAIN ═══ -->
-<main id="main">
+  <!-- Messages -->
   <div id="messages">
     <div class="welcome" id="welcome">
-      <h1>Ask <span class="accent">anything</span> — watch YouTube know it</h1>
-      <p>Enter a topic and a question. VidAI finds the best YouTube videos,<br/>
-      transcribes them, and answers you with AI — like having a research assistant.</p>
+      <span class="welcome-icon">🎬</span>
+      <h1>Search less.<br/><em>Understand more.</em></h1>
+      <p>Ask a question. VidAI finds the best YouTube video, transcribes it, and gives you a clear AI-powered answer.</p>
+      <div class="welcome-chips">
+        <div class="welcome-chip" onclick="fillExample('learn Python fast','What are the best ways to start?')">Learn Python fast</div>
+        <div class="welcome-chip" onclick="fillExample('healthy breakfast ideas','What are easy healthy options?')">Healthy breakfast</div>
+        <div class="welcome-chip" onclick="fillExample('UPSC preparation strategy','How to prepare from scratch?')">UPSC preparation</div>
+      </div>
     </div>
   </div>
 
+  <!-- Input Bar -->
   <div id="inputBar">
-    <div id="inputWrap">
-      <div class="mode-tabs">
-        <button class="mode-tab active" id="tabSearch" onclick="switchMode('search')">🔍 New Search</button>
-        <button class="mode-tab" id="tabFollowup" onclick="switchMode('followup')" id="tabFollowup">💬 Follow-up</button>
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tabSearch" onclick="switchMode('search')">🔍 New Search</button>
+      <button class="mode-tab" id="tabFollowup" onclick="switchMode('followup')">💬 Follow-up</button>
+    </div>
+    <div id="inputBox">
+      <div class="topic-row" id="topicRow">
+        <span class="topic-label">Topic</span>
+        <input id="topicInput" placeholder="What topic to search on YouTube?" autocomplete="off"/>
       </div>
-      <div id="topicRow">
-        <span id="topicLabel">Topic:</span>
-        <input id="topicInput" placeholder="e.g. IIT MTech admission without GATE" autocomplete="off"/>
+      <div class="followup-note" id="followupNote">
+        💬 Asking about: <strong id="followupTopic">—</strong>
       </div>
-      <div id="followupNote" class="followup-note" style="display:none;">
-        <span>Asking about: </span><span id="followupTopic" style="font-weight:600;">—</span>
-      </div>
-      <div id="divider"></div>
-      <div id="questionRow">
-        <textarea id="questionInput" placeholder="What do you want to know? (press Enter to send)" rows="1"></textarea>
-        <button id="sendBtn" onclick="handleSend()" title="Search">&#9658;</button>
+      <div class="divider"></div>
+      <div class="question-row">
+        <textarea id="questionInput" placeholder="Your question… (Enter to send)" rows="1"></textarea>
+        <button id="sendBtn" onclick="handleSend()" title="Send">&#9658;</button>
       </div>
     </div>
-    <p class="hint">Shift+Enter for new line &nbsp;·&nbsp; Enter to send &nbsp;·&nbsp; Switch to Follow-up to ask more without re-searching</p>
+    <p class="hint">Shift+Enter for new line · After answer, switch to Follow-up for more questions</p>
   </div>
-</main>
+
+</div>
 
 <script>
-// ── state ──────────────────────────────────────────────────────────────────
-let sessionId    = generateId();
+// ── State ──────────────────────────────────────────────────────────────────
+let sessionId    = genId();
 let isStreaming  = false;
-let isDark       = false;
-let chatHistory  = [];
-let videoCards   = {};       // video_id → { badgeEl, transcriptBtn, transcriptPanel }
-let transcripts  = {};       // video_id → text
 let currentTopic = "";
-let currentMode  = "search"; // "search" | "followup"
-let videosMsgEl  = null;     // the DOM element containing the videos block (for adding more)
+let currentMode  = "search";
+let videoCard    = null;   // single video card element ref
+let transcripts  = {};     // video_id → text
 
-function generateId(){ return Math.random().toString(36).slice(2) }
+function genId() { return Math.random().toString(36).slice(2); }
 
-// ── theme ──────────────────────────────────────────────────────────────────
-document.getElementById("themeBtn").onclick = () => {
+// ── Theme toggle ──────────────────────────────────────────────────────────
+let isDark = true;
+function toggleTheme(){
   isDark = !isDark;
-  document.documentElement.setAttribute("data-theme", isDark ? "dark" : "");
-  document.getElementById("themeBtn").textContent = isDark ? "☀️" : "🌙";
-};
+  document.documentElement.setAttribute("data-theme", isDark ? "" : "light");
+  document.getElementById("themeBtn").textContent = isDark ? "🌙" : "☀️";
+}
 
-// ── mode switch ────────────────────────────────────────────────────────────
+// ── Example fill ──────────────────────────────────────────────────────────
+function fillExample(topic, q){
+  document.getElementById("topicInput").value = topic;
+  document.getElementById("questionInput").value = q;
+  document.getElementById("questionInput").style.height = "auto";
+  document.getElementById("questionInput").style.height = document.getElementById("questionInput").scrollHeight + "px";
+  switchMode("search");
+}
+
+// ── Mode switch ───────────────────────────────────────────────────────────
 function switchMode(mode){
   currentMode = mode;
   document.getElementById("tabSearch").classList.toggle("active", mode === "search");
   document.getElementById("tabFollowup").classList.toggle("active", mode === "followup");
-  document.getElementById("topicRow").classList.toggle("hidden", mode === "followup");
+  document.getElementById("topicRow").style.display = mode === "followup" ? "none" : "";
   document.getElementById("followupNote").style.display = mode === "followup" ? "block" : "none";
-  const ph = mode === "followup"
-    ? "Ask a follow-up question about the current topic..."
-    : "What do you want to know? (press Enter to send)";
-  document.getElementById("questionInput").placeholder = ph;
-  if(mode === "followup" && !currentTopic){
-    document.getElementById("questionInput").placeholder = "⚠️ Search a topic first, then ask follow-ups here";
-  }
+  document.getElementById("questionInput").placeholder = mode === "followup"
+    ? "Ask a follow-up question…"
+    : "Your question… (Enter to send)";
 }
 
-// ── textarea auto-resize + Enter key ──────────────────────────────────────
+// ── Auto-resize textarea ──────────────────────────────────────────────────
 const qInput = document.getElementById("questionInput");
 qInput.addEventListener("input", () => {
   qInput.style.height = "auto";
@@ -475,127 +785,95 @@ document.getElementById("topicInput").addEventListener("keydown", e => {
   if(e.key === "Enter"){ e.preventDefault(); handleSend(); }
 });
 
-// ── new chat ───────────────────────────────────────────────────────────────
-function newChat(){
-  sessionId = generateId();
-  videoCards = {};
-  transcripts = {};
-  currentTopic = "";
-  videosMsgEl = null;
-  document.getElementById("messages").innerHTML = `
-    <div class="welcome" id="welcome">
-      <h1>Ask <span class="accent">anything</span> — watch YouTube know it</h1>
-      <p>Enter a topic and a question. VidAI finds the best YouTube videos,<br/>
-      transcribes them, and answers you with AI — like having a research assistant.</p>
-    </div>`;
-  document.getElementById("topicInput").value = "";
-  document.getElementById("questionInput").value = "";
-  document.getElementById("questionInput").style.height = "";
-  document.getElementById("sessionInfo").textContent = "No active session";
-  switchMode("search");
+// ── Remove welcome ────────────────────────────────────────────────────────
+function removeWelcome(){
+  const w = document.getElementById("welcome");
+  if(w) w.remove();
 }
 
-// ── history ────────────────────────────────────────────────────────────────
-function addToHistory(topic){
-  if(chatHistory.length && chatHistory[0].topic === topic && chatHistory[0].sessionId === sessionId) return;
-  chatHistory.unshift({topic, sessionId});
-  renderHistory();
-}
-function renderHistory(){
-  const el = document.getElementById("historyList");
-  if(!chatHistory.length){ el.innerHTML = `<p style="font-size:.8rem;color:var(--muted)">No searches yet</p>`; return; }
-  el.innerHTML = chatHistory.slice(0,12).map((h)=>`
-    <div class="history-item ${h.sessionId===sessionId?'active':''}" title="${h.topic}">${h.topic}</div>
-  `).join("");
-}
-
-function updateSessionInfo(){
-  const count = Object.keys(videoCards).length;
-  const txCount = Object.keys(transcripts).length;
-  document.getElementById("sessionInfo").innerHTML =
-    `Topic: <strong>${currentTopic || '—'}</strong><br/>Videos loaded: <strong>${count}</strong><br/>Transcribed: <strong>${txCount}</strong>`;
-  document.getElementById("followupTopic").textContent = currentTopic || "—";
-}
-
-// ── append message helpers ─────────────────────────────────────────────────
-function removeWelcome(){ const w=document.getElementById("welcome"); if(w) w.remove(); }
-
+// ── Append message ────────────────────────────────────────────────────────
 function appendMsg(role, html, id){
   removeWelcome();
   const msgs = document.getElementById("messages");
-  const div = document.createElement("div");
-  div.className = `msg ${role}`;
-  if(id) div.id = id;
-  const initials = role.includes("user") ? "U" : "V";
-  if(role.includes("status") || role.includes("progress")){
-    div.innerHTML = `<div class="avatar">V</div><div class="bubble" style="padding:0;background:transparent;border:none;box-shadow:none;max-width:calc(100% - 46px);width:100%;">${html}</div>`;
-  } else {
-    div.innerHTML = `<div class="avatar">${initials}</div><div class="bubble">${html}</div>`;
-  }
-  msgs.appendChild(div);
+  const wrap = document.createElement("div");
+  wrap.className = `msg ${role}`;
+  if(id) wrap.id = id;
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "user" ? "U" : "V";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = html;
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  if(role === "user") wrap.classList.add("user");
+  msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
-  return div;
+  return wrap;
+}
+// Properly handles user (reversed) layout
+function appendUserMsg(html){
+  removeWelcome();
+  const msgs = document.getElementById("messages");
+  const wrap = document.createElement("div");
+  wrap.className = "msg user";
+  wrap.innerHTML = `<div class="avatar">U</div><div class="bubble">${html}</div>`;
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  return wrap;
+}
+function appendAIMsg(html, id){
+  removeWelcome();
+  const msgs = document.getElementById("messages");
+  const wrap = document.createElement("div");
+  wrap.className = "msg ai";
+  if(id) wrap.id = id;
+  wrap.innerHTML = `<div class="avatar">V</div><div class="bubble">${html}</div>`;
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  return wrap;
 }
 
-// ── Progress panel ─────────────────────────────────────────────────────────
+// ── Progress Panel ────────────────────────────────────────────────────────
 const STEPS = [
-  { id:"search",     label:"Searching YouTube",       icon:"🔍" },
-  { id:"download",   label:"Downloading audio",        icon:"⬇️" },
-  { id:"transcribe", label:"Transcribing with AI",     icon:"🎙️" },
-  { id:"generate",   label:"Generating AI answer",     icon:"✨" },
+  { id:"search",     label:"Searching YouTube",      icon:"🔍" },
+  { id:"download",   label:"Downloading audio",       icon:"⬇️" },
+  { id:"transcribe", label:"Transcribing with AI",    icon:"🎙️" },
+  { id:"generate",   label:"Generating AI answer",    icon:"✨" },
 ];
-
 let progressEl = null;
-let stepStates = {}; // stepId → "waiting"|"active"|"done"|"error"
-let stepDetails = {};
 
 function createProgressPanel(){
-  stepStates = { search:"waiting", download:"waiting", transcribe:"waiting", generate:"waiting" };
-  stepDetails = {};
   const html = `
-    <div class="progress-panel" id="progressPanel">
-      <div class="progress-title">⚙️ Processing your request</div>
-      <div class="steps-list" id="stepsList">
-        ${STEPS.map(s => renderStep(s, "waiting", "")).join("")}
+    <div class="progress-panel">
+      <div class="progress-title">⚙ Processing</div>
+      <div class="steps-list">
+        ${STEPS.map(s => `
+          <div class="step waiting" id="step-${s.id}">
+            <div class="step-spinner-wrap"><div class="step-spinner"></div></div>
+            <div class="step-icon">⬜</div>
+            <div class="step-body">
+              <div class="step-label">${s.label}</div>
+            </div>
+          </div>`).join("")}
       </div>
     </div>`;
-  progressEl = appendMsg("ai progress", html);
+  progressEl = appendAIMsg(html);
   return progressEl;
 }
 
-function renderStep(s, state, detail){
-  const icons = { waiting:"⬜", done:"✅", error:"❌" };
-  return `
-    <div class="step ${state}" id="step-${s.id}">
-      <div class="step-spinner-wrap"><div class="step-spinner"></div></div>
-      <div class="step-icon">${state === "waiting" ? icons.waiting : state === "done" ? icons.done : state === "error" ? icons.error : s.icon}</div>
-      <div class="step-body">
-        <div class="step-label">${s.label}</div>
-        ${detail ? `<div class="step-detail">${detail}</div>` : ""}
-      </div>
-    </div>`;
-}
-
 function updateStep(stepId, state, detail){
-  stepStates[stepId] = state;
-  stepDetails[stepId] = detail || "";
   const el = document.getElementById(`step-${stepId}`);
   if(!el) return;
   const s = STEPS.find(x => x.id === stepId);
-  const icons = { waiting:"⬜", done:"✅", error:"❌" };
+  const icons = { waiting:"⬜", done:"✅", error:"❌", active: s.icon };
   el.className = `step ${state}`;
-  el.querySelector(".step-icon").textContent = state === "waiting" ? icons.waiting : state === "done" ? icons.done : state === "error" ? icons.error : s.icon;
-  el.querySelector(".step-label").textContent = s.label;
-  const detailEl = el.querySelector(".step-detail");
+  el.querySelector(".step-icon").textContent = icons[state] || "⬜";
   if(detail){
-    if(detailEl) detailEl.textContent = detail;
-    else {
-      const d = document.createElement("div");
-      d.className = "step-detail";
-      d.textContent = detail;
-      el.querySelector(".step-body").appendChild(d);
-    }
-  } else if(detailEl) detailEl.remove();
+    let d = el.querySelector(".step-detail");
+    if(!d){ d = document.createElement("div"); d.className = "step-detail"; el.querySelector(".step-body").appendChild(d); }
+    d.textContent = detail;
+  }
   document.getElementById("messages").scrollTop = 9999;
 }
 
@@ -603,63 +881,54 @@ function removeProgressPanel(){
   if(progressEl){ progressEl.remove(); progressEl = null; }
 }
 
-// ── Video cards block ──────────────────────────────────────────────────────
-function createOrUpdateVideosBlock(videos, isAddMore){
-  if(!isAddMore || !videosMsgEl){
-    // Create fresh block
-    const wrapper = document.createElement("div");
-    wrapper.className = "msg ai";
-    wrapper.innerHTML = `<div class="avatar">V</div><div class="bubble" id="videosBubble"><div class="videos-header">Sources — <span id="videosCount">0</span> video(s) loaded</div><div class="videos-row" id="videosRow"></div><div id="addMoreBar"></div></div>`;
-    removeWelcome();
-    document.getElementById("messages").appendChild(wrapper);
-    document.getElementById("messages").scrollTop = 9999;
-    videosMsgEl = wrapper;
-  }
+// ── Video Card ────────────────────────────────────────────────────────────
+function createVideoCard(video){
+  // Remove existing video section if any
+  const existing = document.getElementById("videoSection");
+  if(existing) existing.remove();
 
-  const row = document.getElementById("videosRow");
-  videos.forEach(v => {
-    if(document.getElementById(`vc-${v.video_id}`)) return; // already exists
-    const card = document.createElement("div");
-    card.className = "video-card";
-    card.id = `vc-${v.video_id}`;
-    card.innerHTML = `
-      <a class="vc-top" href="${v.url}" target="_blank">
-        <img src="${v.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none'"/>
-        <div class="vc-info">
-          <div class="vc-title">${v.title}</div>
-          <div class="vc-meta">${v.channel}${v.views_fmt?' · '+v.views_fmt:''}${v.duration?' · '+v.duration:''}</div>
+  removeWelcome();
+  const msgs = document.getElementById("messages");
+  const wrap = document.createElement("div");
+  wrap.className = "msg ai";
+  wrap.id = "videoSection";
+  wrap.innerHTML = `
+    <div class="avatar">V</div>
+    <div class="video-section">
+      <div class="video-section-label">Source Video</div>
+      <div class="video-card" id="vc-${video.video_id}">
+        <a class="vc-main" href="${video.url}" target="_blank" rel="noopener">
+          <img class="vc-thumb" src="${video.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none'"/>
+          <div class="vc-info">
+            <div class="vc-title">${video.title}</div>
+            <div class="vc-meta">${video.channel}${video.views_fmt ? ' · ' + video.views_fmt : ''}${video.duration ? ' · ' + video.duration : ''}</div>
+          </div>
+          <span class="vc-badge processing" id="vcb-${video.video_id}">⏳ Processing</span>
+        </a>
+        <div class="vc-actions">
+          <a class="vc-btn" href="${video.url}" target="_blank" rel="noopener">↗ Watch</a>
+          <button class="vc-btn transcript" id="vct-${video.video_id}" style="display:none;" onclick="toggleTranscript('${video.video_id}')">📄 Transcript</button>
         </div>
-        <div class="vc-right">
-          <span class="vc-badge processing" id="vcb-${v.video_id}">⏳ Processing</span>
-          <button class="vc-transcript-btn" id="vct-${v.video_id}" onclick="toggleTranscript('${v.video_id}')" style="display:none;">📄 View Transcript</button>
+        <div class="vc-transcript-panel" id="vctp-${video.video_id}">
+          <div class="vc-transcript-inner" id="vctx-${video.video_id}">Loading…</div>
         </div>
-      </a>
-      <div class="vc-transcript-panel" id="vctp-${v.video_id}">
-        <div class="vc-transcript-inner" id="vctx-${v.video_id}">Loading transcript...</div>
-      </div>`;
-    row.appendChild(card);
-    videoCards[v.video_id] = {
-      badge: document.getElementById(`vcb-${v.video_id}`),
-      transcriptBtn: document.getElementById(`vct-${v.video_id}`),
-      transcriptPanel: document.getElementById(`vctp-${v.video_id}`),
-    };
-  });
-
-  document.getElementById("videosCount").textContent = Object.keys(videoCards).length;
-  renderAddMoreBar();
-  document.getElementById("messages").scrollTop = 9999;
+      </div>
+    </div>`;
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  videoCard = wrap;
+  return wrap;
 }
 
-function renderAddMoreBar(){
-  const bar = document.getElementById("addMoreBar");
-  if(!bar) return;
-  bar.innerHTML = `
-    <div class="add-videos-bar" style="margin-top:10px;">
-      <span style="font-size:.78rem;color:var(--muted);white-space:nowrap;">➕ Add videos:</span>
-      <input id="addMoreQuery" placeholder="Same topic or new search term..." value="${currentTopic}"/>
-      <input type="number" id="addMoreCount" min="1" max="5" value="1" style="width:60px;padding:6px 8px;font-size:.82rem;"/>
-      <button class="add-videos-btn" id="addMoreBtn" onclick="handleAddMoreVideos()">Add</button>
-    </div>`;
+function setBadge(video_id, state){
+  const b = document.getElementById(`vcb-${video_id}`);
+  if(!b) return;
+  b.className = `vc-badge ${state}`;
+  b.textContent = state === "ready" ? "✅ Done" : state === "error" ? "❌ Failed" : "⏳ Processing";
+  if(state === "ready"){
+    const btn = document.getElementById(`vct-${video_id}`);
+    if(btn) btn.style.display = "block";
+  }
 }
 
 function toggleTranscript(videoId){
@@ -667,71 +936,52 @@ function toggleTranscript(videoId){
   const btn   = document.getElementById(`vct-${videoId}`);
   const inner = document.getElementById(`vctx-${videoId}`);
   if(!panel) return;
-  const isOpen = panel.classList.contains("open");
-  panel.classList.toggle("open", !isOpen);
-  btn.textContent = isOpen ? "📄 View Transcript" : "📄 Hide Transcript";
-  if(!isOpen && transcripts[videoId]){
-    inner.textContent = transcripts[videoId];
-  }
+  const open = panel.classList.toggle("open");
+  btn.textContent = open ? "📄 Hide" : "📄 Transcript";
+  if(open && transcripts[videoId]) inner.textContent = transcripts[videoId];
 }
 
-function setBadge(video_id, state, text){
-  const vc = videoCards[video_id];
-  if(!vc) return;
-  vc.badge.className = `vc-badge ${state}`;
-  vc.badge.textContent = text || (state==="ready" ? "✅ Done" : state==="error" ? "❌ Failed" : "⏳ Processing");
-  if(state === "ready" && vc.transcriptBtn){
-    vc.transcriptBtn.style.display = "block";
-  }
-}
-
-// ── Answer actions ─────────────────────────────────────────────────────────
-function addAnswerActions(bubble, fullText){
-  const div = document.createElement("div");
-  div.className = "answer-actions";
-  div.innerHTML = `
-    <button class="action-btn" onclick="copyText(this, \`${fullText.replace(/`/g,"\\`").replace(/\n/g,"\\n")}\`)">📋 Copy</button>
-    <button class="action-btn" onclick="downloadText(\`${fullText.replace(/`/g,"\\`").replace(/\n/g,"\\n")}\`)">⬇ Download</button>
-    <button class="action-btn" onclick="switchMode('followup');document.getElementById('questionInput').focus()">💬 Ask follow-up</button>`;
-  bubble.appendChild(div);
-}
-
-function copyText(btn, text){
-  navigator.clipboard.writeText(text).then(()=>{
-    btn.textContent = "✓ Copied!";
-    setTimeout(()=>btn.textContent="📋 Copy", 2000);
-  });
-}
-function downloadText(text){
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text],{type:"text/plain"}));
-  a.download = "vidai_answer.txt";
-  a.click();
-}
-
-// ── Markdown renderer ──────────────────────────────────────────────────────
+// ── Markdown renderer ─────────────────────────────────────────────────────
 function renderMd(text){
   return text
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/^## (.+)$/gm, '<div class="md-h2">$1</div>')
     .replace(/^### (.+)$/gm, '<div class="md-h3">$1</div>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="md-bold">$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code>$1</code>')
-    .replace(/^[-•] (.+)$/gm, '<li class="md-li">$1</li>')
+    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
     .replace(/(<li[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
-    .replace(/\n\n/g, '</p><p class="md-p">')
+    .replace(/\n\n/g, '</p><p>')
     .replace(/\n/g, '<br/>')
-    .replace(/^(?!<)(.+)$/gm, '<p class="md-p">$1</p>');
+    .replace(/^(?!<)(.+)$/gm, '<p>$1</p>');
 }
 
-// ── SSE reader ─────────────────────────────────────────────────────────────
+// ── Answer actions ────────────────────────────────────────────────────────
+function addAnswerActions(bubble, fullText){
+  const div = document.createElement("div");
+  div.className = "answer-actions";
+  div.innerHTML = `
+    <button class="act-btn" onclick="copyAnswer(this, \`${fullText.replace(/`/g,"\\`").replace(/\n/g,"\\n")}\`)">📋 Copy</button>
+    <button class="act-btn followup" onclick="switchMode('followup');document.getElementById('questionInput').focus()">💬 Ask follow-up</button>
+  `;
+  bubble.appendChild(div);
+}
+
+function copyAnswer(btn, text){
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = "✓ Copied!";
+    setTimeout(() => btn.textContent = "📋 Copy", 2000);
+  });
+}
+
+// ── SSE reader ────────────────────────────────────────────────────────────
 async function readSSE(resp, handlers){
   const reader = resp.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
   while(true){
-    const {done,value} = await reader.read();
+    const {done, value} = await reader.read();
     if(done) break;
     buf += dec.decode(value, {stream:true});
     const lines = buf.split("\n");
@@ -742,12 +992,18 @@ async function readSSE(resp, handlers){
         const obj = JSON.parse(line.slice(5).trim());
         const fn = handlers[obj.event];
         if(fn) fn(obj);
-      }catch{}
+      } catch{}
     }
   }
 }
 
-// ── MAIN SEND ──────────────────────────────────────────────────────────────
+// ── Set loading ───────────────────────────────────────────────────────────
+function setLoading(v){
+  isStreaming = v;
+  document.getElementById("sendBtn").disabled = v;
+}
+
+// ── MAIN SEND ─────────────────────────────────────────────────────────────
 async function handleSend(){
   if(isStreaming) return;
 
@@ -755,37 +1011,35 @@ async function handleSend(){
     const q = qInput.value.trim();
     if(!q) return;
     if(!currentTopic){
-      appendMsg("ai", `<span style="color:var(--err)">⚠️ Please do a new search first before asking follow-up questions.</span>`);
+      appendAIMsg(`<div class="toast err">⚠️ Please do a New Search first before asking follow-up questions.</div>`);
       return;
     }
     await runFollowUp(q);
     return;
   }
 
-  // new search
-  const topic = document.getElementById("topicInput").value.trim();
+  const topic    = document.getElementById("topicInput").value.trim();
   const question = qInput.value.trim();
   if(!topic){ document.getElementById("topicInput").focus(); return; }
+  const language = document.getElementById("langSelect").value;
 
-  const numVideos = parseInt(document.getElementById("numVideos").value) || 2;
-  const language  = document.getElementById("langSelect").value;
-
-  appendMsg("user", `<strong>${topic}</strong>${question ? '<br/><span style="opacity:.7;font-size:.88em">'+question+'</span>' : ""}`);
+  appendUserMsg(`<strong>${topic}</strong>${question ? `<br/><span style="opacity:.75;font-size:.85em">${question}</span>` : ""}`);
   qInput.value = "";
   qInput.style.height = "";
   setLoading(true);
+
   currentTopic = topic;
-  addToHistory(topic);
-  // Reset video state for new search
-  videoCards = {};
   transcripts = {};
-  videosMsgEl = null;
-  updateSessionInfo();
+  document.getElementById("followupTopic").textContent = topic;
 
   createProgressPanel();
-  updateStep("search", "active", `Searching for "${topic}"...`);
+  updateStep("search", "active", `Searching for "${topic}"…`);
 
-  const body = JSON.stringify({ topic, question, num_videos: numVideos, language, session_id: sessionId });
+  const body = JSON.stringify({
+    topic, question: question || `Give a detailed summary and key insights about: ${topic}`,
+    num_videos: 1, language, session_id: sessionId
+  });
+
   let answerBubble = null;
   let answerText = "";
 
@@ -793,41 +1047,32 @@ async function handleSend(){
     const resp = await fetch("/api/search", { method:"POST", headers:{"Content-Type":"application/json"}, body });
     await readSSE(resp, {
       status: (d) => {
-        const msg = d.message.toLowerCase();
-        if(msg.includes("searching")) updateStep("search", "active", d.message);
-        else if(msg.includes("download") || msg.includes("transcrib")) {
-          updateStep("search", "done");
-          if(msg.includes("download")) updateStep("download", "active", d.message);
-          else {
-            updateStep("download", "done");
-            updateStep("transcribe", "active", d.message);
-          }
-        } else if(msg.includes("generat") || msg.includes("ai answer")) {
-          updateStep("transcribe", "done");
-          updateStep("generate", "active", d.message);
-        }
+        const m = d.message.toLowerCase();
+        if(m.includes("download")) { updateStep("search","done"); updateStep("download","active", d.message); }
+        else if(m.includes("transcrib")) { updateStep("download","done"); updateStep("transcribe","active", d.message); }
+        else if(m.includes("generat")) { updateStep("transcribe","done"); updateStep("generate","active", d.message); }
       },
       videos: (d) => {
-        updateStep("search", "done", `Found ${d.videos.length} video${d.videos.length>1?'s':''}`);
-        updateStep("download", "active", "Downloading audio from videos...");
-        createOrUpdateVideosBlock(d.videos, false);
-        updateSessionInfo();
+        updateStep("search","done", `Found: ${d.videos[0]?.title?.substring(0,40)}…`);
+        updateStep("download","active","Downloading audio…");
+        if(d.videos.length > 0) createVideoCard(d.videos[0]);
       },
       transcript_ready: (d) => {
+        updateStep("transcribe","active",`Transcribed successfully`);
         setBadge(d.video_id, "ready");
-        updateStep("transcribe", "active", `Transcribed: ${d.title.substring(0,40)}...`);
-        // store transcript text via answer_done will fill in — but we get it from transcript_ready
-        updateSessionInfo();
       },
       transcript_error: (d) => {
         setBadge(d.video_id, "error");
       },
+      transcript_text: (d) => {
+        if(d.video_id && d.text) transcripts[d.video_id] = d.text;
+      },
       answer_start: () => {
-        updateStep("download", "done");
-        updateStep("transcribe", "done", "All transcriptions complete");
-        updateStep("generate", "active", "Streaming AI response...");
+        updateStep("download","done");
+        updateStep("transcribe","done");
+        updateStep("generate","active","Streaming AI response…");
         removeProgressPanel();
-        const el = appendMsg("ai", '<span class="cursor"></span>');
+        const el = appendAIMsg('<span class="cursor"></span>');
         answerBubble = el.querySelector(".bubble");
       },
       token: (d) => {
@@ -838,50 +1083,50 @@ async function handleSend(){
       answer_done: (d) => {
         answerBubble.innerHTML = renderMd(d.full_answer);
         addAnswerActions(answerBubble, d.full_answer);
-        // auto switch to follow-up mode hint
         switchMode("followup");
         document.getElementById("messages").scrollTop = 9999;
       },
-      transcript_text: (d) => {
-        // optional: if backend sends transcript text
-        if(d.video_id && d.text) transcripts[d.video_id] = d.text;
-      },
       error: (d) => {
         removeProgressPanel();
-        appendMsg("ai", `<span style="color:var(--err)">❌ ${d.message}</span>`);
+        appendAIMsg(`<div class="toast err">❌ ${d.message}</div>`);
       },
     });
   } catch(e) {
     removeProgressPanel();
-    appendMsg("ai", `<span style="color:var(--err)">❌ Network error: ${e.message}</span>`);
+    appendAIMsg(`<div class="toast err">❌ Network error: ${e.message}</div>`);
   }
 
-  updateSessionInfo();
   setLoading(false);
 }
 
-// ── FOLLOW-UP (NO re-search) ──────────────────────────────────────────────
+// ── FOLLOW-UP ─────────────────────────────────────────────────────────────
 async function runFollowUp(question){
-  appendMsg("user", question);
+  appendUserMsg(question);
   setLoading(true);
   qInput.value = "";
   qInput.style.height = "";
 
   const language = document.getElementById("langSelect").value;
-  let answerBubble = null;
-  let answerText = "";
 
-  // show a simple "thinking" line, not the full progress panel
-  const thinkEl = appendMsg("ai", `<span style="color:var(--muted);font-size:.85rem;display:flex;align-items:center;gap:8px;"><span class="spinner" style="width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;"></span> Thinking about your follow-up...</span>`);
+  // thinking indicator
+  const thinkEl = appendAIMsg(`
+    <div class="thinking">
+      <div class="thinking-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <span>Thinking…</span>
+    </div>`);
 
   const body = JSON.stringify({ question, language, session_id: sessionId });
+  let answerBubble = null;
+  let answerText = "";
 
   try {
     const resp = await fetch("/api/followup", { method:"POST", headers:{"Content-Type":"application/json"}, body });
     await readSSE(resp, {
       answer_start: () => {
         thinkEl.remove();
-        const el = appendMsg("ai", '<span class="cursor"></span>');
+        const el = appendAIMsg('<span class="cursor"></span>');
         answerBubble = el.querySelector(".bubble");
       },
       token: (d) => {
@@ -896,82 +1141,15 @@ async function runFollowUp(question){
       },
       error: (d) => {
         thinkEl.remove();
-        appendMsg("ai", `<span style="color:var(--err)">❌ ${d.message}</span>`);
+        appendAIMsg(`<div class="toast err">❌ ${d.message}</div>`);
       },
     });
   } catch(e) {
     thinkEl.remove();
-    appendMsg("ai", `<span style="color:var(--err)">❌ ${e.message}</span>`);
+    appendAIMsg(`<div class="toast err">❌ ${e.message}</div>`);
   }
 
   setLoading(false);
-}
-
-// ── ADD MORE VIDEOS ────────────────────────────────────────────────────────
-async function handleAddMoreVideos(){
-  if(isStreaming) return;
-  const queryEl = document.getElementById("addMoreQuery");
-  const countEl = document.getElementById("addMoreCount");
-  const btn     = document.getElementById("addMoreBtn");
-  const query   = queryEl?.value.trim() || currentTopic;
-  const count   = parseInt(countEl?.value) || 1;
-  if(!query) return;
-
-  btn.disabled = true;
-  btn.textContent = "Adding...";
-  setLoading(true);
-
-  // Show a small status in messages
-  const statusEl = appendMsg("ai", `<span style="color:var(--muted);font-size:.85rem;display:flex;align-items:center;gap:8px;"><span class="spinner" style="width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent2);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;"></span> Finding ${count} more video${count>1?'s':''} for "${query}"...</span>`);
-
-  const language = document.getElementById("langSelect").value;
-  const body = JSON.stringify({
-    topic: query,
-    question: `Add more sources about: ${currentTopic}`,
-    num_videos: count,
-    language,
-    session_id: sessionId,
-    add_more: true,
-  });
-
-  try {
-    const resp = await fetch("/api/add_videos", { method:"POST", headers:{"Content-Type":"application/json"}, body });
-    await readSSE(resp, {
-      status: (d) => {
-        statusEl.querySelector("span:last-child").textContent = d.message;
-      },
-      videos: (d) => {
-        createOrUpdateVideosBlock(d.videos, true);
-        updateSessionInfo();
-      },
-      transcript_ready: (d) => {
-        setBadge(d.video_id, "ready");
-        updateSessionInfo();
-      },
-      transcript_error: (d) => {
-        setBadge(d.video_id, "error");
-      },
-      done: (d) => {
-        statusEl.remove();
-        appendMsg("ai", `<span style="color:var(--success)">✅ Added ${d.count || count} more video${count>1?'s':''} to your session. You can now ask follow-up questions using all sources.</span>`);
-      },
-      error: (d) => {
-        statusEl.remove();
-        appendMsg("ai", `<span style="color:var(--err)">❌ ${d.message}</span>`);
-      },
-    });
-  } catch(e) {
-    statusEl.remove();
-    appendMsg("ai", `<span style="color:var(--err)">❌ ${e.message}</span>`);
-  }
-
-  if(btn){ btn.disabled = false; btn.textContent = "Add"; }
-  setLoading(false);
-}
-
-function setLoading(v){
-  isStreaming = v;
-  document.getElementById("sendBtn").disabled = v;
 }
 </script>
 </body>
