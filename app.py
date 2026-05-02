@@ -12,8 +12,8 @@ from flask_cors import CORS
 from google import genai
 
 # ── API Keys ───────────────────────────────────────────────────────────────────
-SARVAM_API_KEY = "sk_zd8flmdq_ScDU3PJg8VRUSwIR9d6bUMD1"
-GEMINI_API_KEY = "AIzaSyA7R0Gj-wrg4ZsrF85i1ELE4DBypGnKhas"
+SARVAM_API_KEY = "sk_ul"
+GEMINI_API_KEY = "AIzaSyDPuqRXKI"
 
 SARVAM_URL    = "https://api.sarvam.ai/speech-to-text"
 OUTPUT_DIR    = os.path.join(os.path.dirname(__file__), "downloads")
