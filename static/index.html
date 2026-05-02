@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VidAI — YouTube Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #f5f0eb;
+    --sidebar:   #ede8e1;
+    --surface:   #ffffff;
+    --border:    #ddd8d0;
+    --text:      #2c2825;
+    --muted:     #8a8278;
+    --accent:    #c96a2e;
+    --accent2:   #7c5cbf;
+    --user-bg:   #2c2825;
+    --user-text: #f5f0eb;
+    --ai-bg:     #ffffff;
+    --ai-border: #ddd8d0;
+    --shadow:    0 2px 12px rgba(44,40,37,.08);
+    --radius:    16px;
+    --tag-bg:    #ede8e1;
+    --success:   #1a6b2f;
+    --success-bg:#d4edda;
+    --warn-bg:   #fff3cd;
+    --warn:      #856404;
+    --err-bg:    #f8d7da;
+    --err:       #721c24;
+    --step-done: #c96a2e;
+    --step-active:#2c2825;
+    --step-wait: #c5bdb3;
+  }
+  [data-theme="dark"] {
+    --bg:        #1a1816;
+    --sidebar:   #141210;
+    --surface:   #222018;
+    --border:    #333028;
+    --text:      #e8e2d9;
+    --muted:     #7a7268;
+    --accent:    #e07d3c;
+    --accent2:   #9b7de0;
+    --user-bg:   #e8e2d9;
+    --user-text: #1a1816;
+    --ai-bg:     #222018;
+    --ai-border: #333028;
+    --shadow:    0 2px 12px rgba(0,0,0,.3);
+    --tag-bg:    #2a2820;
+    --success-bg:#0d2e15;
+    --success:   #4caf70;
+    --warn-bg:   #2e2600;
+    --warn:      #d4a017;
+    --err-bg:    #2e0a0d;
+    --err:       #e07080;
+    --step-done: #e07d3c;
+    --step-active:#e8e2d9;
+    --step-wait: #444038;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'DM Sans',sans-serif;
+    background:var(--bg);color:var(--text);
+    display:flex;height:100vh;overflow:hidden;
+    transition:background .3s,color .3s;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar{
+    width:260px;min-width:260px;
+    background:var(--sidebar);
+    border-right:1px solid var(--border);
+    display:flex;flex-direction:column;
+    padding:20px 16px;gap:16px;
+    overflow-y:auto;transition:background .3s;
+  }
+  .sidebar-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding-bottom:12px;border-bottom:1px solid var(--border);
+  }
+  .logo{font-family:'Lora',serif;font-size:1.4rem;font-weight:600;color:var(--accent);letter-spacing:-.5px;}
+  .logo span{color:var(--text)}
+  #themeBtn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.2rem;padding:4px;border-radius:8px;transition:background .2s;}
+  #themeBtn:hover{background:var(--border)}
+  .sidebar-section{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:4px;}
+  label.field-label{font-size:.8rem;color:var(--muted);font-weight:500;display:block;margin-bottom:4px;}
+  select,input[type=number]{
+    width:100%;padding:8px 10px;
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;color:var(--text);
+    font-family:'DM Sans',sans-serif;font-size:.88rem;
+    outline:none;transition:border .2s;
+  }
+  select:focus,input[type=number]:focus{border-color:var(--accent)}
+  .new-chat-btn{
+    width:100%;padding:10px;background:var(--accent);color:#fff;
+    border:none;border-radius:12px;font-family:'DM Sans',sans-serif;
+    font-size:.9rem;font-weight:500;cursor:pointer;transition:opacity .2s;
+  }
+  .new-chat-btn:hover{opacity:.88}
+  #historyList{display:flex;flex-direction:column;gap:6px;}
+  .history-item{
+    padding:8px 10px;border-radius:10px;background:var(--surface);
+    border:1px solid var(--border);cursor:pointer;
+    font-size:.82rem;color:var(--text);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    transition:background .15s;
+  }
+  .history-item:hover{background:var(--border)}
+  .history-item.active{border-color:var(--accent);color:var(--accent)}
+
+  /* ── Main ── */
+  #main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+  #messages{
+    flex:1;overflow-y:auto;padding:32px 20px 16px;
+    display:flex;flex-direction:column;gap:20px;scroll-behavior:smooth;
+  }
+  #messages::-webkit-scrollbar{width:6px}
+  #messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+
+  .welcome{text-align:center;margin:auto;max-width:520px;padding:40px 20px;}
+  .welcome h1{font-family:'Lora',serif;font-size:2rem;font-weight:600;color:var(--text);margin-bottom:10px;}
+  .welcome p{color:var(--muted);font-size:.95rem;line-height:1.6}
+  .welcome .accent{color:var(--accent)}
+
+  /* ── Message bubbles ── */
+  .msg{display:flex;gap:12px;max-width:820px;width:100%;margin:0 auto;}
+  .msg.user{flex-direction:row-reverse}
+  .avatar{
+    width:34px;height:34px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:.85rem;font-weight:600;flex-shrink:0;margin-top:2px;
+  }
+  .msg.ai .avatar{background:var(--accent);color:#fff}
+  .msg.user .avatar{background:var(--user-bg);color:var(--user-text)}
+  .bubble{
+    padding:14px 18px;border-radius:var(--radius);
+    line-height:1.65;font-size:.93rem;
+    max-width:calc(100% - 46px);
+  }
+  .msg.user .bubble{background:var(--user-bg);color:var(--user-text);border-bottom-right-radius:4px;}
+  .msg.ai .bubble{background:var(--ai-bg);color:var(--text);border:1px solid var(--ai-border);border-bottom-left-radius:4px;box-shadow:var(--shadow);}
+  .bubble h2,.bubble h3{font-family:'Lora',serif;margin:14px 0 6px;color:var(--accent);}
+  .bubble h2{font-size:1.1rem}
+  .bubble h3{font-size:.98rem}
+  .bubble p{margin-bottom:8px}
+  .bubble ul,.bubble ol{padding-left:18px;margin-bottom:8px}
+  .bubble li{margin-bottom:4px}
+  .bubble strong{font-weight:600}
+  .bubble code{background:var(--tag-bg);padding:1px 6px;border-radius:5px;font-size:.85rem;}
+
+  /* ── PROGRESS PANEL ── */
+  .progress-panel{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:16px 18px;
+    box-shadow:var(--shadow);
+    max-width:calc(100% - 46px);
+    width:100%;
+  }
+  .progress-title{
+    font-size:.8rem;font-weight:600;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--muted);margin-bottom:12px;
+  }
+  .steps-list{display:flex;flex-direction:column;gap:8px;}
+  .step{
+    display:flex;align-items:flex-start;gap:10px;
+    font-size:.88rem;padding:8px 10px;border-radius:10px;
+    transition:background .2s,color .2s;
+  }
+  .step.done{background:var(--success-bg);color:var(--success);}
+  .step.active{background:var(--warn-bg);color:var(--warn);}
+  .step.error{background:var(--err-bg);color:var(--err);}
+  .step.waiting{color:var(--step-wait);}
+  .step-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .step-body{flex:1;}
+  .step-label{font-weight:600;line-height:1.3;}
+  .step-detail{font-size:.78rem;opacity:.8;margin-top:2px;line-height:1.4;}
+
+  /* progress bar inside step */
+  .step-progress{
+    height:4px;background:var(--border);border-radius:99px;
+    margin-top:6px;overflow:hidden;
+  }
+  .step-progress-bar{
+    height:100%;background:var(--accent);border-radius:99px;
+    transition:width .4s ease;
+  }
+
+  /* active step spinner */
+  .step-spinner{
+    display:inline-block;width:14px;height:14px;
+    border:2px solid rgba(133,100,4,.3);
+    border-top-color:var(--warn);
+    border-radius:50%;animation:spin .7s linear infinite;
+    flex-shrink:0;margin-top:2px;
+  }
+  .step.active .step-icon{ display:none; }
+  .step-spinner-wrap{ display:none; flex-shrink:0; }
+  .step.active .step-spinner-wrap{ display:flex; }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Video cards ── */
+  .videos-header{font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:8px;}
+  .videos-row{display:flex;flex-direction:column;gap:8px;}
+  .video-card{
+    background:var(--tag-bg);border:1px solid var(--border);
+    border-radius:12px;overflow:hidden;
+    transition:box-shadow .2s,border-color .2s;
+  }
+  .video-card:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+  .vc-top{display:flex;gap:10px;padding:10px;text-decoration:none;color:var(--text);}
+  .vc-top img{width:100px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;}
+  .vc-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;}
+  .vc-title{font-size:.82rem;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;}
+  .vc-meta{font-size:.73rem;color:var(--muted)}
+  .vc-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+  .vc-badge{font-size:.65rem;padding:3px 8px;border-radius:99px;font-weight:600;white-space:nowrap;}
+  .vc-badge.ready{background:var(--success-bg);color:var(--success)}
+  .vc-badge.processing{background:var(--warn-bg);color:var(--warn)}
+  .vc-badge.error{background:var(--err-bg);color:var(--err)}
+  .vc-transcript-btn{
+    font-size:.7rem;padding:3px 9px;border-radius:8px;
+    border:1px solid var(--border);background:var(--surface);
+    color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;
+    transition:all .15s;white-space:nowrap;
+  }
+  .vc-transcript-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .vc-transcript-panel{
+    display:none;padding:0 10px 10px;
+    border-top:1px solid var(--border);margin-top:-2px;
+  }
+  .vc-transcript-panel.open{display:block;}
+  .vc-transcript-inner{
+    max-height:180px;overflow-y:auto;
+    font-size:.8rem;line-height:1.6;color:var(--muted);
+    padding:10px;background:var(--surface);
+    border-radius:8px;margin-top:8px;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .vc-transcript-inner::-webkit-scrollbar{width:4px}
+  .vc-transcript-inner::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+
+  /* ── Add more videos bar ── */
+  .add-videos-bar{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 14px;
+    background:var(--tag-bg);border:1px dashed var(--border);
+    border-radius:12px;margin-top:4px;
+  }
+  .add-videos-bar input{
+    flex:1;border:none;outline:none;background:transparent;
+    font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--text);
+    padding:2px 0;
+  }
+  .add-videos-bar input::placeholder{color:var(--muted)}
+  .add-videos-btn{
+    padding:6px 14px;border-radius:8px;
+    background:var(--accent2);color:#fff;
+    border:none;cursor:pointer;font-size:.82rem;font-weight:500;
+    font-family:'DM Sans',sans-serif;transition:opacity .2s;white-space:nowrap;
+  }
+  .add-videos-btn:hover{opacity:.85}
+  .add-videos-btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ── Answer actions ── */
+  .answer-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .action-btn{
+    padding:5px 12px;border-radius:8px;border:1px solid var(--border);
+    background:var(--tag-bg);color:var(--muted);font-size:.78rem;font-weight:500;
+    cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;
+  }
+  .action-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* cursor blink */
+  .cursor{display:inline-block;width:2px;height:1em;background:var(--accent);margin-left:2px;vertical-align:text-bottom;animation:blink .7s step-end infinite;}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ── Input bar ── */
+  #inputBar{padding:16px 20px 20px;border-top:1px solid var(--border);background:var(--bg);}
+  #inputWrap{
+    max-width:820px;margin:0 auto;background:var(--surface);
+    border:1.5px solid var(--border);border-radius:18px;
+    box-shadow:var(--shadow);transition:border-color .2s;overflow:hidden;
+  }
+  #inputWrap:focus-within{border-color:var(--accent)}
+
+  /* mode toggle */
+  .mode-tabs{
+    display:flex;align-items:center;gap:0;
+    padding:8px 14px 0;border-bottom:1px solid var(--border);
+  }
+  .mode-tab{
+    padding:5px 12px;font-size:.78rem;font-weight:500;
+    border-radius:8px 8px 0 0;cursor:pointer;color:var(--muted);
+    background:none;border:none;font-family:'DM Sans',sans-serif;
+    transition:color .2s,background .2s;
+    position:relative;bottom:-1px;border:1px solid transparent;
+  }
+  .mode-tab.active{
+    color:var(--accent);border-color:var(--border);
+    border-bottom-color:var(--surface);background:var(--surface);
+  }
+
+  #topicRow{display:flex;align-items:center;padding:8px 14px 0;gap:8px;}
+  #topicLabel{font-size:.72rem;color:var(--muted);font-weight:500;white-space:nowrap;}
+  #topicInput{
+    flex:1;border:none;outline:none;background:transparent;
+    font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--text);padding:6px 0;
+  }
+  #topicInput::placeholder{color:var(--muted)}
+  #topicRow.hidden{display:none;}
+
+  #divider{height:1px;background:var(--border);margin:0 14px}
+  #questionRow{display:flex;align-items:flex-end;padding:6px 14px 10px;gap:8px;}
+  #questionInput{
+    flex:1;border:none;outline:none;background:transparent;
+    font-family:'DM Sans',sans-serif;font-size:.93rem;color:var(--text);
+    resize:none;min-height:28px;max-height:120px;line-height:1.5;padding:4px 0;
+  }
+  #questionInput::placeholder{color:var(--muted)}
+  #sendBtn{
+    width:38px;height:38px;border-radius:12px;background:var(--accent);color:#fff;
+    border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;transition:opacity .2s;font-size:1rem;
+  }
+  #sendBtn:disabled{opacity:.4;cursor:not-allowed}
+  #sendBtn:not(:disabled):hover{opacity:.85}
+  .hint{text-align:center;font-size:.72rem;color:var(--muted);margin-top:8px;max-width:820px;margin-left:auto;margin-right:auto;}
+
+  /* mode indicator in input */
+  .followup-note{
+    padding:6px 14px 0;font-size:.75rem;color:var(--accent2);font-weight:500;
+  }
+  .followup-note span{opacity:.7}
+
+  /* md helpers */
+  .md-h2{font-family:'Lora',serif;font-size:1.05rem;font-weight:600;color:var(--accent);margin:14px 0 5px}
+  .md-h3{font-family:'Lora',serif;font-size:.95rem;font-weight:600;color:var(--accent2);margin:10px 0 4px}
+  .md-p{margin-bottom:7px;line-height:1.65}
+  .md-li{margin-bottom:3px;line-height:1.55}
+  .md-bold{font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">Vid<span>AI</span></div>
+    <button id="themeBtn" title="Toggle theme">🌙</button>
+  </div>
+
+  <button class="new-chat-btn" onclick="newChat()">+ New Search</button>
+
+  <div>
+    <div class="sidebar-section">Settings</div>
+    <br/>
+    <label class="field-label">Number of videos</label>
+    <input type="number" id="numVideos" min="1" max="10" value="2"/>
+    <br/><br/>
+    <label class="field-label">Output language</label>
+    <select id="langSelect">
+      <option value="English">English</option>
+      <option value="Hindi">Hindi</option>
+      <option value="Telugu">Telugu</option>
+      <option value="Tamil">Tamil</option>
+      <option value="Kannada">Kannada</option>
+      <option value="Malayalam">Malayalam</option>
+      <option value="Bengali">Bengali</option>
+      <option value="Marathi">Marathi</option>
+      <option value="Gujarati">Gujarati</option>
+      <option value="Spanish">Spanish</option>
+      <option value="French">French</option>
+      <option value="German">German</option>
+      <option value="Japanese">Japanese</option>
+      <option value="Chinese">Chinese</option>
+    </select>
+  </div>
+
+  <div>
+    <div class="sidebar-section">Session Info</div>
+    <br/>
+    <div id="sessionInfo" style="font-size:.78rem;color:var(--muted);line-height:1.6;">
+      No active session
+    </div>
+  </div>
+
+  <div>
+    <div class="sidebar-section">History</div>
+    <br/>
+    <div id="historyList"><p style="font-size:.8rem;color:var(--muted)">No searches yet</p></div>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main id="main">
+  <div id="messages">
+    <div class="welcome" id="welcome">
+      <h1>Ask <span class="accent">anything</span> — watch YouTube know it</h1>
+      <p>Enter a topic and a question. VidAI finds the best YouTube videos,<br/>
+      transcribes them, and answers you with AI — like having a research assistant.</p>
+    </div>
+  </div>
+
+  <div id="inputBar">
+    <div id="inputWrap">
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tabSearch" onclick="switchMode('search')">🔍 New Search</button>
+        <button class="mode-tab" id="tabFollowup" onclick="switchMode('followup')" id="tabFollowup">💬 Follow-up</button>
+      </div>
+      <div id="topicRow">
+        <span id="topicLabel">Topic:</span>
+        <input id="topicInput" placeholder="e.g. IIT MTech admission without GATE" autocomplete="off"/>
+      </div>
+      <div id="followupNote" class="followup-note" style="display:none;">
+        <span>Asking about: </span><span id="followupTopic" style="font-weight:600;">—</span>
+      </div>
+      <div id="divider"></div>
+      <div id="questionRow">
+        <textarea id="questionInput" placeholder="What do you want to know? (press Enter to send)" rows="1"></textarea>
+        <button id="sendBtn" onclick="handleSend()" title="Search">&#9658;</button>
+      </div>
+    </div>
+    <p class="hint">Shift+Enter for new line &nbsp;·&nbsp; Enter to send &nbsp;·&nbsp; Switch to Follow-up to ask more without re-searching</p>
+  </div>
+</main>
+
+<script>
+// ── state ──────────────────────────────────────────────────────────────────
+let sessionId    = generateId();
+let isStreaming  = false;
+let isDark       = false;
+let chatHistory  = [];
+let videoCards   = {};       // video_id → { badgeEl, transcriptBtn, transcriptPanel }
+let transcripts  = {};       // video_id → text
+let currentTopic = "";
+let currentMode  = "search"; // "search" | "followup"
+let videosMsgEl  = null;     // the DOM element containing the videos block (for adding more)
+
+function generateId(){ return Math.random().toString(36).slice(2) }
+
+// ── theme ──────────────────────────────────────────────────────────────────
+document.getElementById("themeBtn").onclick = () => {
+  isDark = !isDark;
+  document.documentElement.setAttribute("data-theme", isDark ? "dark" : "");
+  document.getElementById("themeBtn").textContent = isDark ? "☀️" : "🌙";
+};
+
+// ── mode switch ────────────────────────────────────────────────────────────
+function switchMode(mode){
+  currentMode = mode;
+  document.getElementById("tabSearch").classList.toggle("active", mode === "search");
+  document.getElementById("tabFollowup").classList.toggle("active", mode === "followup");
+  document.getElementById("topicRow").classList.toggle("hidden", mode === "followup");
+  document.getElementById("followupNote").style.display = mode === "followup" ? "block" : "none";
+  const ph = mode === "followup"
+    ? "Ask a follow-up question about the current topic..."
+    : "What do you want to know? (press Enter to send)";
+  document.getElementById("questionInput").placeholder = ph;
+  if(mode === "followup" && !currentTopic){
+    document.getElementById("questionInput").placeholder = "⚠️ Search a topic first, then ask follow-ups here";
+  }
+}
+
+// ── textarea auto-resize + Enter key ──────────────────────────────────────
+const qInput = document.getElementById("questionInput");
+qInput.addEventListener("input", () => {
+  qInput.style.height = "auto";
+  qInput.style.height = qInput.scrollHeight + "px";
+});
+qInput.addEventListener("keydown", e => {
+  if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); handleSend(); }
+});
+document.getElementById("topicInput").addEventListener("keydown", e => {
+  if(e.key === "Enter"){ e.preventDefault(); handleSend(); }
+});
+
+// ── new chat ───────────────────────────────────────────────────────────────
+function newChat(){
+  sessionId = generateId();
+  videoCards = {};
+  transcripts = {};
+  currentTopic = "";
+  videosMsgEl = null;
+  document.getElementById("messages").innerHTML = `
+    <div class="welcome" id="welcome">
+      <h1>Ask <span class="accent">anything</span> — watch YouTube know it</h1>
+      <p>Enter a topic and a question. VidAI finds the best YouTube videos,<br/>
+      transcribes them, and answers you with AI — like having a research assistant.</p>
+    </div>`;
+  document.getElementById("topicInput").value = "";
+  document.getElementById("questionInput").value = "";
+  document.getElementById("questionInput").style.height = "";
+  document.getElementById("sessionInfo").textContent = "No active session";
+  switchMode("search");
+}
+
+// ── history ────────────────────────────────────────────────────────────────
+function addToHistory(topic){
+  if(chatHistory.length && chatHistory[0].topic === topic && chatHistory[0].sessionId === sessionId) return;
+  chatHistory.unshift({topic, sessionId});
+  renderHistory();
+}
+function renderHistory(){
+  const el = document.getElementById("historyList");
+  if(!chatHistory.length){ el.innerHTML = `<p style="font-size:.8rem;color:var(--muted)">No searches yet</p>`; return; }
+  el.innerHTML = chatHistory.slice(0,12).map((h)=>`
+    <div class="history-item ${h.sessionId===sessionId?'active':''}" title="${h.topic}">${h.topic}</div>
+  `).join("");
+}
+
+function updateSessionInfo(){
+  const count = Object.keys(videoCards).length;
+  const txCount = Object.keys(transcripts).length;
+  document.getElementById("sessionInfo").innerHTML =
+    `Topic: <strong>${currentTopic || '—'}</strong><br/>Videos loaded: <strong>${count}</strong><br/>Transcribed: <strong>${txCount}</strong>`;
+  document.getElementById("followupTopic").textContent = currentTopic || "—";
+}
+
+// ── append message helpers ─────────────────────────────────────────────────
+function removeWelcome(){ const w=document.getElementById("welcome"); if(w) w.remove(); }
+
+function appendMsg(role, html, id){
+  removeWelcome();
+  const msgs = document.getElementById("messages");
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  if(id) div.id = id;
+  const initials = role.includes("user") ? "U" : "V";
+  if(role.includes("status") || role.includes("progress")){
+    div.innerHTML = `<div class="avatar">V</div><div class="bubble" style="padding:0;background:transparent;border:none;box-shadow:none;max-width:calc(100% - 46px);width:100%;">${html}</div>`;
+  } else {
+    div.innerHTML = `<div class="avatar">${initials}</div><div class="bubble">${html}</div>`;
+  }
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+// ── Progress panel ─────────────────────────────────────────────────────────
+const STEPS = [
+  { id:"search",     label:"Searching YouTube",       icon:"🔍" },
+  { id:"download",   label:"Downloading audio",        icon:"⬇️" },
+  { id:"transcribe", label:"Transcribing with AI",     icon:"🎙️" },
+  { id:"generate",   label:"Generating AI answer",     icon:"✨" },
+];
+
+let progressEl = null;
+let stepStates = {}; // stepId → "waiting"|"active"|"done"|"error"
+let stepDetails = {};
+
+function createProgressPanel(){
+  stepStates = { search:"waiting", download:"waiting", transcribe:"waiting", generate:"waiting" };
+  stepDetails = {};
+  const html = `
+    <div class="progress-panel" id="progressPanel">
+      <div class="progress-title">⚙️ Processing your request</div>
+      <div class="steps-list" id="stepsList">
+        ${STEPS.map(s => renderStep(s, "waiting", "")).join("")}
+      </div>
+    </div>`;
+  progressEl = appendMsg("ai progress", html);
+  return progressEl;
+}
+
+function renderStep(s, state, detail){
+  const icons = { waiting:"⬜", done:"✅", error:"❌" };
+  return `
+    <div class="step ${state}" id="step-${s.id}">
+      <div class="step-spinner-wrap"><div class="step-spinner"></div></div>
+      <div class="step-icon">${state === "waiting" ? icons.waiting : state === "done" ? icons.done : state === "error" ? icons.error : s.icon}</div>
+      <div class="step-body">
+        <div class="step-label">${s.label}</div>
+        ${detail ? `<div class="step-detail">${detail}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+function updateStep(stepId, state, detail){
+  stepStates[stepId] = state;
+  stepDetails[stepId] = detail || "";
+  const el = document.getElementById(`step-${stepId}`);
+  if(!el) return;
+  const s = STEPS.find(x => x.id === stepId);
+  const icons = { waiting:"⬜", done:"✅", error:"❌" };
+  el.className = `step ${state}`;
+  el.querySelector(".step-icon").textContent = state === "waiting" ? icons.waiting : state === "done" ? icons.done : state === "error" ? icons.error : s.icon;
+  el.querySelector(".step-label").textContent = s.label;
+  const detailEl = el.querySelector(".step-detail");
+  if(detail){
+    if(detailEl) detailEl.textContent = detail;
+    else {
+      const d = document.createElement("div");
+      d.className = "step-detail";
+      d.textContent = detail;
+      el.querySelector(".step-body").appendChild(d);
+    }
+  } else if(detailEl) detailEl.remove();
+  document.getElementById("messages").scrollTop = 9999;
+}
+
+function removeProgressPanel(){
+  if(progressEl){ progressEl.remove(); progressEl = null; }
+}
+
+// ── Video cards block ──────────────────────────────────────────────────────
+function createOrUpdateVideosBlock(videos, isAddMore){
+  if(!isAddMore || !videosMsgEl){
+    // Create fresh block
+    const wrapper = document.createElement("div");
+    wrapper.className = "msg ai";
+    wrapper.innerHTML = `<div class="avatar">V</div><div class="bubble" id="videosBubble"><div class="videos-header">Sources — <span id="videosCount">0</span> video(s) loaded</div><div class="videos-row" id="videosRow"></div><div id="addMoreBar"></div></div>`;
+    removeWelcome();
+    document.getElementById("messages").appendChild(wrapper);
+    document.getElementById("messages").scrollTop = 9999;
+    videosMsgEl = wrapper;
+  }
+
+  const row = document.getElementById("videosRow");
+  videos.forEach(v => {
+    if(document.getElementById(`vc-${v.video_id}`)) return; // already exists
+    const card = document.createElement("div");
+    card.className = "video-card";
+    card.id = `vc-${v.video_id}`;
+    card.innerHTML = `
+      <a class="vc-top" href="${v.url}" target="_blank">
+        <img src="${v.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none'"/>
+        <div class="vc-info">
+          <div class="vc-title">${v.title}</div>
+          <div class="vc-meta">${v.channel}${v.views_fmt?' · '+v.views_fmt:''}${v.duration?' · '+v.duration:''}</div>
+        </div>
+        <div class="vc-right">
+          <span class="vc-badge processing" id="vcb-${v.video_id}">⏳ Processing</span>
+          <button class="vc-transcript-btn" id="vct-${v.video_id}" onclick="toggleTranscript('${v.video_id}')" style="display:none;">📄 View Transcript</button>
+        </div>
+      </a>
+      <div class="vc-transcript-panel" id="vctp-${v.video_id}">
+        <div class="vc-transcript-inner" id="vctx-${v.video_id}">Loading transcript...</div>
+      </div>`;
+    row.appendChild(card);
+    videoCards[v.video_id] = {
+      badge: document.getElementById(`vcb-${v.video_id}`),
+      transcriptBtn: document.getElementById(`vct-${v.video_id}`),
+      transcriptPanel: document.getElementById(`vctp-${v.video_id}`),
+    };
+  });
+
+  document.getElementById("videosCount").textContent = Object.keys(videoCards).length;
+  renderAddMoreBar();
+  document.getElementById("messages").scrollTop = 9999;
+}
+
+function renderAddMoreBar(){
+  const bar = document.getElementById("addMoreBar");
+  if(!bar) return;
+  bar.innerHTML = `
+    <div class="add-videos-bar" style="margin-top:10px;">
+      <span style="font-size:.78rem;color:var(--muted);white-space:nowrap;">➕ Add videos:</span>
+      <input id="addMoreQuery" placeholder="Same topic or new search term..." value="${currentTopic}"/>
+      <input type="number" id="addMoreCount" min="1" max="5" value="1" style="width:60px;padding:6px 8px;font-size:.82rem;"/>
+      <button class="add-videos-btn" id="addMoreBtn" onclick="handleAddMoreVideos()">Add</button>
+    </div>`;
+}
+
+function toggleTranscript(videoId){
+  const panel = document.getElementById(`vctp-${videoId}`);
+  const btn   = document.getElementById(`vct-${videoId}`);
+  const inner = document.getElementById(`vctx-${videoId}`);
+  if(!panel) return;
+  const isOpen = panel.classList.contains("open");
+  panel.classList.toggle("open", !isOpen);
+  btn.textContent = isOpen ? "📄 View Transcript" : "📄 Hide Transcript";
+  if(!isOpen && transcripts[videoId]){
+    inner.textContent = transcripts[videoId];
+  }
+}
+
+function setBadge(video_id, state, text){
+  const vc = videoCards[video_id];
+  if(!vc) return;
+  vc.badge.className = `vc-badge ${state}`;
+  vc.badge.textContent = text || (state==="ready" ? "✅ Done" : state==="error" ? "❌ Failed" : "⏳ Processing");
+  if(state === "ready" && vc.transcriptBtn){
+    vc.transcriptBtn.style.display = "block";
+  }
+}
+
+// ── Answer actions ─────────────────────────────────────────────────────────
+function addAnswerActions(bubble, fullText){
+  const div = document.createElement("div");
+  div.className = "answer-actions";
+  div.innerHTML = `
+    <button class="action-btn" onclick="copyText(this, \`${fullText.replace(/`/g,"\\`").replace(/\n/g,"\\n")}\`)">📋 Copy</button>
+    <button class="action-btn" onclick="downloadText(\`${fullText.replace(/`/g,"\\`").replace(/\n/g,"\\n")}\`)">⬇ Download</button>
+    <button class="action-btn" onclick="switchMode('followup');document.getElementById('questionInput').focus()">💬 Ask follow-up</button>`;
+  bubble.appendChild(div);
+}
+
+function copyText(btn, text){
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent = "✓ Copied!";
+    setTimeout(()=>btn.textContent="📋 Copy", 2000);
+  });
+}
+function downloadText(text){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text],{type:"text/plain"}));
+  a.download = "vidai_answer.txt";
+  a.click();
+}
+
+// ── Markdown renderer ──────────────────────────────────────────────────────
+function renderMd(text){
+  return text
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/^## (.+)$/gm, '<div class="md-h2">$1</div>')
+    .replace(/^### (.+)$/gm, '<div class="md-h3">$1</div>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="md-bold">$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^[-•] (.+)$/gm, '<li class="md-li">$1</li>')
+    .replace(/(<li[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
+    .replace(/\n\n/g, '</p><p class="md-p">')
+    .replace(/\n/g, '<br/>')
+    .replace(/^(?!<)(.+)$/gm, '<p class="md-p">$1</p>');
+}
+
+// ── SSE reader ─────────────────────────────────────────────────────────────
+async function readSSE(resp, handlers){
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while(true){
+    const {done,value} = await reader.read();
+    if(done) break;
+    buf += dec.decode(value, {stream:true});
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for(const line of lines){
+      if(!line.startsWith("data:")) continue;
+      try{
+        const obj = JSON.parse(line.slice(5).trim());
+        const fn = handlers[obj.event];
+        if(fn) fn(obj);
+      }catch{}
+    }
+  }
+}
+
+// ── MAIN SEND ──────────────────────────────────────────────────────────────
+async function handleSend(){
+  if(isStreaming) return;
+
+  if(currentMode === "followup"){
+    const q = qInput.value.trim();
+    if(!q) return;
+    if(!currentTopic){
+      appendMsg("ai", `<span style="color:var(--err)">⚠️ Please do a new search first before asking follow-up questions.</span>`);
+      return;
+    }
+    await runFollowUp(q);
+    return;
+  }
+
+  // new search
+  const topic = document.getElementById("topicInput").value.trim();
+  const question = qInput.value.trim();
+  if(!topic){ document.getElementById("topicInput").focus(); return; }
+
+  const numVideos = parseInt(document.getElementById("numVideos").value) || 2;
+  const language  = document.getElementById("langSelect").value;
+
+  appendMsg("user", `<strong>${topic}</strong>${question ? '<br/><span style="opacity:.7;font-size:.88em">'+question+'</span>' : ""}`);
+  qInput.value = "";
+  qInput.style.height = "";
+  setLoading(true);
+  currentTopic = topic;
+  addToHistory(topic);
+  // Reset video state for new search
+  videoCards = {};
+  transcripts = {};
+  videosMsgEl = null;
+  updateSessionInfo();
+
+  createProgressPanel();
+  updateStep("search", "active", `Searching for "${topic}"...`);
+
+  const body = JSON.stringify({ topic, question, num_videos: numVideos, language, session_id: sessionId });
+  let answerBubble = null;
+  let answerText = "";
+
+  try {
+    const resp = await fetch("/api/search", { method:"POST", headers:{"Content-Type":"application/json"}, body });
+    await readSSE(resp, {
+      status: (d) => {
+        const msg = d.message.toLowerCase();
+        if(msg.includes("searching")) updateStep("search", "active", d.message);
+        else if(msg.includes("download") || msg.includes("transcrib")) {
+          updateStep("search", "done");
+          if(msg.includes("download")) updateStep("download", "active", d.message);
+          else {
+            updateStep("download", "done");
+            updateStep("transcribe", "active", d.message);
+          }
+        } else if(msg.includes("generat") || msg.includes("ai answer")) {
+          updateStep("transcribe", "done");
+          updateStep("generate", "active", d.message);
+        }
+      },
+      videos: (d) => {
+        updateStep("search", "done", `Found ${d.videos.length} video${d.videos.length>1?'s':''}`);
+        updateStep("download", "active", "Downloading audio from videos...");
+        createOrUpdateVideosBlock(d.videos, false);
+        updateSessionInfo();
+      },
+      transcript_ready: (d) => {
+        setBadge(d.video_id, "ready");
+        updateStep("transcribe", "active", `Transcribed: ${d.title.substring(0,40)}...`);
+        // store transcript text via answer_done will fill in — but we get it from transcript_ready
+        updateSessionInfo();
+      },
+      transcript_error: (d) => {
+        setBadge(d.video_id, "error");
+      },
+      answer_start: () => {
+        updateStep("download", "done");
+        updateStep("transcribe", "done", "All transcriptions complete");
+        updateStep("generate", "active", "Streaming AI response...");
+        removeProgressPanel();
+        const el = appendMsg("ai", '<span class="cursor"></span>');
+        answerBubble = el.querySelector(".bubble");
+      },
+      token: (d) => {
+        answerText += d.text;
+        answerBubble.innerHTML = renderMd(answerText) + '<span class="cursor"></span>';
+        document.getElementById("messages").scrollTop = 9999;
+      },
+      answer_done: (d) => {
+        answerBubble.innerHTML = renderMd(d.full_answer);
+        addAnswerActions(answerBubble, d.full_answer);
+        // auto switch to follow-up mode hint
+        switchMode("followup");
+        document.getElementById("messages").scrollTop = 9999;
+      },
+      transcript_text: (d) => {
+        // optional: if backend sends transcript text
+        if(d.video_id && d.text) transcripts[d.video_id] = d.text;
+      },
+      error: (d) => {
+        removeProgressPanel();
+        appendMsg("ai", `<span style="color:var(--err)">❌ ${d.message}</span>`);
+      },
+    });
+  } catch(e) {
+    removeProgressPanel();
+    appendMsg("ai", `<span style="color:var(--err)">❌ Network error: ${e.message}</span>`);
+  }
+
+  updateSessionInfo();
+  setLoading(false);
+}
+
+// ── FOLLOW-UP (NO re-search) ──────────────────────────────────────────────
+async function runFollowUp(question){
+  appendMsg("user", question);
+  setLoading(true);
+  qInput.value = "";
+  qInput.style.height = "";
+
+  const language = document.getElementById("langSelect").value;
+  let answerBubble = null;
+  let answerText = "";
+
+  // show a simple "thinking" line, not the full progress panel
+  const thinkEl = appendMsg("ai", `<span style="color:var(--muted);font-size:.85rem;display:flex;align-items:center;gap:8px;"><span class="spinner" style="width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;"></span> Thinking about your follow-up...</span>`);
+
+  const body = JSON.stringify({ question, language, session_id: sessionId });
+
+  try {
+    const resp = await fetch("/api/followup", { method:"POST", headers:{"Content-Type":"application/json"}, body });
+    await readSSE(resp, {
+      answer_start: () => {
+        thinkEl.remove();
+        const el = appendMsg("ai", '<span class="cursor"></span>');
+        answerBubble = el.querySelector(".bubble");
+      },
+      token: (d) => {
+        answerText += d.text;
+        answerBubble.innerHTML = renderMd(answerText) + '<span class="cursor"></span>';
+        document.getElementById("messages").scrollTop = 9999;
+      },
+      answer_done: (d) => {
+        answerBubble.innerHTML = renderMd(d.full_answer);
+        addAnswerActions(answerBubble, d.full_answer);
+        document.getElementById("messages").scrollTop = 9999;
+      },
+      error: (d) => {
+        thinkEl.remove();
+        appendMsg("ai", `<span style="color:var(--err)">❌ ${d.message}</span>`);
+      },
+    });
+  } catch(e) {
+    thinkEl.remove();
+    appendMsg("ai", `<span style="color:var(--err)">❌ ${e.message}</span>`);
+  }
+
+  setLoading(false);
+}
+
+// ── ADD MORE VIDEOS ────────────────────────────────────────────────────────
+async function handleAddMoreVideos(){
+  if(isStreaming) return;
+  const queryEl = document.getElementById("addMoreQuery");
+  const countEl = document.getElementById("addMoreCount");
+  const btn     = document.getElementById("addMoreBtn");
+  const query   = queryEl?.value.trim() || currentTopic;
+  const count   = parseInt(countEl?.value) || 1;
+  if(!query) return;
+
+  btn.disabled = true;
+  btn.textContent = "Adding...";
+  setLoading(true);
+
+  // Show a small status in messages
+  const statusEl = appendMsg("ai", `<span style="color:var(--muted);font-size:.85rem;display:flex;align-items:center;gap:8px;"><span class="spinner" style="width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent2);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;"></span> Finding ${count} more video${count>1?'s':''} for "${query}"...</span>`);
+
+  const language = document.getElementById("langSelect").value;
+  const body = JSON.stringify({
+    topic: query,
+    question: `Add more sources about: ${currentTopic}`,
+    num_videos: count,
+    language,
+    session_id: sessionId,
+    add_more: true,
+  });
+
+  try {
+    const resp = await fetch("/api/add_videos", { method:"POST", headers:{"Content-Type":"application/json"}, body });
+    await readSSE(resp, {
+      status: (d) => {
+        statusEl.querySelector("span:last-child").textContent = d.message;
+      },
+      videos: (d) => {
+        createOrUpdateVideosBlock(d.videos, true);
+        updateSessionInfo();
+      },
+      transcript_ready: (d) => {
+        setBadge(d.video_id, "ready");
+        updateSessionInfo();
+      },
+      transcript_error: (d) => {
+        setBadge(d.video_id, "error");
+      },
+      done: (d) => {
+        statusEl.remove();
+        appendMsg("ai", `<span style="color:var(--success)">✅ Added ${d.count || count} more video${count>1?'s':''} to your session. You can now ask follow-up questions using all sources.</span>`);
+      },
+      error: (d) => {
+        statusEl.remove();
+        appendMsg("ai", `<span style="color:var(--err)">❌ ${d.message}</span>`);
+      },
+    });
+  } catch(e) {
+    statusEl.remove();
+    appendMsg("ai", `<span style="color:var(--err)">❌ ${e.message}</span>`);
+  }
+
+  if(btn){ btn.disabled = false; btn.textContent = "Add"; }
+  setLoading(false);
+}
+
+function setLoading(v){
+  isStreaming = v;
+  document.getElementById("sendBtn").disabled = v;
+}
+</script>
+</body>
+</html>
