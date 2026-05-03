@@ -11,9 +11,13 @@ from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 from google import genai
 
-# ── API Keys ─────────────────────────────────────────────────────────────────
-SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "sk_ul3vhkdy_fbp9YtKgM9oaoZfAy90Fpv04")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDPuqRXKICkFkKGRjk77zNtAz9tn9GDbJ8")
+# ── API Keys ──────────────────────────────────────────────────────────────────
+SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "sk_ul3vhkdy_fbp9YtK")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSy7zNtAz9tn9GDbJ8")
+
+# ── Optional: set WEBSHARE_API_KEY on Render for better proxies ───────────────
+# Sign up free at https://proxy.webshare.io — 10 free proxies included
+WEBSHARE_API_KEY = os.environ.get("WEBSHARE_API_KEY", "")
 
 SARVAM_URL    = "https://api.sarvam.ai/speech-to-text"
 OUTPUT_DIR    = os.path.join(os.path.dirname(__file__), "downloads")
@@ -31,8 +35,12 @@ GEMINI_MODEL  = "gemini-2.5-flash"
 app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
-# { session_id: { "topic": str, "transcripts": [...], "history": [...] } }
 sessions = {}
+
+# ── In-memory proxy cache ─────────────────────────────────────────────────────
+_proxy_cache: list[str] = []
+_proxy_cache_time: float = 0
+_PROXY_TTL = 300  # seconds
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -55,19 +63,84 @@ def get_video_id(url: str) -> str:
 
 
 def cleanup_video_files(video_id: str) -> None:
-    patterns = [
+    seen = set()
+    for pattern in [
         os.path.join(OUTPUT_DIR, f"{video_id}*.*"),
         os.path.join(OUTPUT_DIR, f"{video_id}*"),
-    ]
-    seen = set()
-    for pattern in patterns:
+    ]:
         for path in glob.glob(pattern):
-            if path in seen:
-                continue
-            seen.add(path)
-            if os.path.isfile(path):
+            if path not in seen and os.path.isfile(path):
+                seen.add(path)
                 try:    os.remove(path)
                 except: pass
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Proxy helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _fetch_webshare_proxies() -> list[str]:
+    """Fetch proxies from Webshare API (free tier = 10 proxies)."""
+    if not WEBSHARE_API_KEY:
+        return []
+    try:
+        resp = requests.get(
+            "https://proxy.webshare.io/api/v2/proxy/list/?mode=direct&page=1&page_size=10",
+            headers={"Authorization": f"Token {WEBSHARE_API_KEY}"},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return []
+        data    = resp.json()
+        proxies = []
+        for p in data.get("results", []):
+            host = p.get("proxy_address", "")
+            port = p.get("port", "")
+            user = p.get("username", "")
+            pw   = p.get("password", "")
+            if host and port:
+                if user and pw:
+                    proxies.append(f"http://{user}:{pw}@{host}:{port}")
+                else:
+                    proxies.append(f"http://{host}:{port}")
+        return proxies
+    except Exception:
+        return []
+
+
+def _fetch_free_proxies() -> list[str]:
+    """
+    Fetch a small list of free HTTP proxies from proxyscrape.
+    These are unreliable but free — used as last resort when no Webshare key.
+    """
+    try:
+        resp = requests.get(
+            "https://api.proxyscrape.com/v3/free-proxy-list/get"
+            "?request=displayproxies&protocol=http&timeout=5000"
+            "&country=US,GB,DE&ssl=yes&anonymity=elite",
+            timeout=10,
+        )
+        lines   = [l.strip() for l in resp.text.splitlines() if l.strip()]
+        proxies = [f"http://{l}" for l in lines[:8]]
+        return proxies
+    except Exception:
+        return []
+
+
+def get_proxies() -> list[str]:
+    """Return cached proxy list, refreshing every _PROXY_TTL seconds."""
+    global _proxy_cache, _proxy_cache_time
+    now = time.time()
+    if _proxy_cache and now - _proxy_cache_time < _PROXY_TTL:
+        return _proxy_cache
+
+    proxies = _fetch_webshare_proxies()
+    if not proxies:
+        proxies = _fetch_free_proxies()
+
+    _proxy_cache      = proxies
+    _proxy_cache_time = now
+    return proxies
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -102,40 +175,20 @@ def search_youtube(query: str, top_n: int = 2) -> list[dict]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Audio download — tries multiple player clients to beat bot detection
-#
-# Why these clients?
-#   tv_embedded  — embedded TV client, almost never rate-limited on server IPs
-#   web_creator  — YouTube Studio client, different bot-check rules
-#   android      — mobile client, different token validation path
-#   ios          — Apple client, separate validation
-#
-# We try them one by one until a download succeeds.
+# Audio download — tries proxies to bypass Render IP ban
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Each entry is a list of player_client values to pass to extractor_args
-_PLAYER_CLIENT_ATTEMPTS = [
-    ["tv_embedded"],
-    ["web_creator"],
-    ["android"],
-    ["ios"],
-    ["web_creator", "android"],   # combo fallback
-]
-
-def download_audio(url: str) -> str | None:
-    vid     = get_video_id(url)
+def _base_ydl_opts(vid: str, proxy: str | None = None) -> dict:
     outtmpl = os.path.join(OUTPUT_DIR, f"{vid}.%(ext)s")
-
-    base_opts = {
+    opts = {
         "format":           "bestaudio/best",
         "outtmpl":          outtmpl,
         "quiet":            True,
         "no_warnings":      True,
-        "force_ipv4":       True,
-        "geo_bypass":       True,
         "socket_timeout":   30,
         "retries":          5,
         "fragment_retries": 5,
+        "extractor_args":   {"youtube": {"player_client": ["tv_embedded", "web_creator"]}},
         "http_headers": {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -144,30 +197,46 @@ def download_audio(url: str) -> str | None:
             ),
         },
     }
+    if proxy:
+        opts["proxy"] = proxy
+    return opts
 
-    def find_downloaded() -> str | None:
-        candidates = []
-        for ext in ("mp4", "m4a", "webm", "mkv", "opus", "mp3", "ogg"):
-            candidates.extend(glob.glob(os.path.join(OUTPUT_DIR, f"{vid}*.{ext}")))
-        candidates = [p for p in candidates if not p.endswith(".wav")]
-        if candidates:
-            candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
-            return candidates[0]
-        return None
 
-    for clients in _PLAYER_CLIENT_ATTEMPTS:
-        opts = {
-            **base_opts,
-            "extractor_args": {"youtube": {"player_client": clients}},
-        }
+def _find_downloaded(vid: str) -> str | None:
+    candidates = []
+    for ext in ("mp4", "m4a", "webm", "mkv", "opus", "mp3", "ogg"):
+        candidates.extend(glob.glob(os.path.join(OUTPUT_DIR, f"{vid}*.{ext}")))
+    candidates = [p for p in candidates if not p.endswith(".wav")]
+    if candidates:
+        candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        return candidates[0]
+    return None
+
+
+def download_audio(url: str) -> str | None:
+    vid = get_video_id(url)
+
+    # ── Attempt 1: no proxy (sometimes works on fresh deploys) ───────────────
+    try:
+        with yt_dlp.YoutubeDL(_base_ydl_opts(vid)) as ydl:
+            ydl.download([url])
+        result = _find_downloaded(vid)
+        if result:
+            return result
+    except Exception:
+        pass
+
+    # ── Attempts 2+: rotate through proxies ──────────────────────────────────
+    proxies = get_proxies()
+    for proxy in proxies:
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
+            with yt_dlp.YoutubeDL(_base_ydl_opts(vid, proxy)) as ydl:
                 ydl.download([url])
-            result = find_downloaded()
+            result = _find_downloaded(vid)
             if result:
                 return result
         except Exception:
-            time.sleep(2)
+            time.sleep(1)
             continue
 
     return None
@@ -192,10 +261,8 @@ def convert_to_wav(input_file: str) -> str | None:
 
 def get_duration(wav_file: str) -> float:
     result = subprocess.run(
-        ["ffprobe", "-v", "error",
-         "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1",
-         wav_file],
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", wav_file],
         capture_output=True, text=True
     )
     try:    return float(result.stdout.strip())
@@ -206,27 +273,22 @@ def split_wav(wav_file: str) -> list[str]:
     duration = get_duration(wav_file)
     if not duration:
         return [wav_file]
-
     n_chunks = math.ceil(duration / CHUNK_SECONDS)
     if n_chunks == 1:
         return [wav_file]
-
-    base, _      = os.path.splitext(wav_file)
-    chunk_paths  = []
+    base, _     = os.path.splitext(wav_file)
+    chunk_paths = []
     for i in range(n_chunks):
         chunk_path = f"{base}_chunk{i:03d}.wav"
         r = subprocess.run(
             ["ffmpeg", "-y",
-             "-ss", str(i * CHUNK_SECONDS),
-             "-t",  str(CHUNK_SECONDS),
+             "-ss", str(i * CHUNK_SECONDS), "-t", str(CHUNK_SECONDS),
              "-i",  wav_file,
-             "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
-             chunk_path],
+             "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", chunk_path],
             capture_output=True, text=True
         )
         if r.returncode == 0 and os.path.isfile(chunk_path):
             chunk_paths.append(chunk_path)
-
     return chunk_paths or [wav_file]
 
 
@@ -265,8 +327,7 @@ def transcribe_audio(wav_file: str) -> str:
 
 def get_transcript_for_video(video: dict) -> str | None:
     video_id = video["video_id"]
-    audio    = None
-    wav      = None
+    audio = wav = None
     try:
         audio = download_audio(video["url"])
         if not audio:
@@ -309,25 +370,19 @@ def api_search():
 
     def generate():
         yield sse("status", {"message": f"Searching YouTube for '{topic}'..."})
-
         try:
             videos = search_youtube(topic, top_n=num_videos)
         except Exception as e:
-            yield sse("error", {"message": str(e)})
-            return
+            yield sse("error", {"message": str(e)}); return
 
         if not videos:
-            yield sse("error", {"message": "No videos found."})
-            return
+            yield sse("error", {"message": "No videos found."}); return
 
         yield sse("videos", {"videos": videos})
 
         transcripts = []
         for idx, video in enumerate(videos):
-            yield sse(
-                "status",
-                {"message": f"Downloading & transcribing video {idx+1}/{len(videos)}: {video['title'][:50]}..."}
-            )
+            yield sse("status", {"message": f"Downloading & transcribing video {idx+1}/{len(videos)}: {video['title'][:50]}..."})
             text = get_transcript_for_video(video)
             if text:
                 transcripts.append({**video, "text": text})
@@ -337,8 +392,7 @@ def api_search():
                 yield sse("transcript_error", {"video_id": video["video_id"], "title": video["title"]})
 
         if not transcripts:
-            yield sse("error", {"message": "Could not transcribe any videos."})
-            return
+            yield sse("error", {"message": "Could not transcribe any videos."}); return
 
         sessions[session_id] = {
             "topic":       topic,
@@ -349,13 +403,10 @@ def api_search():
         yield sse("status", {"message": "Generating AI answer..."})
         yield sse("answer_start", {})
 
-        context_blocks = []
-        for i, t in enumerate(transcripts, 1):
-            context_blocks.append(
-                f"--- SOURCE {i}: {t['title']} ---\nURL: {t['url']}\n\n{t['text']}"
-            )
-        context = "\n\n".join(context_blocks)
-
+        context = "\n\n".join(
+            f"--- SOURCE {i}: {t['title']} ---\nURL: {t['url']}\n\n{t['text']}"
+            for i, t in enumerate(transcripts, 1)
+        )
         prompt = f"""You are an expert research assistant. The user searched for "{topic}" on YouTube.
 Below are transcripts from the top {len(transcripts)} videos.
 
@@ -369,28 +420,19 @@ Question: {question}
 If transcripts lack info, say so and summarize what IS available.
 Use clear headings (##) for long responses. Be thorough and helpful.
 """
-
         try:
             full_answer = ""
-            for chunk in gemini_client.models.generate_content_stream(
-                model=GEMINI_MODEL,
-                contents=prompt,
-            ):
-                word         = chunk.text or ""
+            for chunk in gemini_client.models.generate_content_stream(model=GEMINI_MODEL, contents=prompt):
+                word = chunk.text or ""
                 full_answer += word
                 yield sse("token", {"text": word})
-
             sessions[session_id]["history"].append({"role": "assistant", "content": full_answer})
             yield sse("answer_done", {"full_answer": full_answer})
-
         except Exception as e:
             yield sse("error", {"message": f"Gemini error: {str(e)}"})
 
-    return Response(
-        generate(),
-        mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -412,19 +454,14 @@ def api_followup():
 
     def generate():
         yield sse("answer_start", {})
-
-        context_blocks = []
-        for i, t in enumerate(session["transcripts"], 1):
-            context_blocks.append(
-                f"--- SOURCE {i}: {t['title']} ---\nURL: {t['url']}\n\n{t['text']}"
-            )
-        context = "\n\n".join(context_blocks)
-
-        history_text = ""
-        for msg in session["history"]:
-            role          = "User" if msg["role"] == "user" else "Assistant"
-            history_text += f"{role}: {msg['content']}\n\n"
-
+        context = "\n\n".join(
+            f"--- SOURCE {i}: {t['title']} ---\nURL: {t['url']}\n\n{t['text']}"
+            for i, t in enumerate(session["transcripts"], 1)
+        )
+        history_text = "".join(
+            f"{'User' if m['role']=='user' else 'Assistant'}: {m['content']}\n\n"
+            for m in session["history"]
+        )
         prompt = f"""You are an expert research assistant continuing a conversation about "{session['topic']}".
 
 VIDEO TRANSCRIPTS:
@@ -438,30 +475,20 @@ Now answer this follow-up question in {language}:
 
 Use the transcripts and conversation history. Use headings if needed.
 """
-
         session["history"].append({"role": "user", "content": question})
-
         try:
             full_answer = ""
-            for chunk in gemini_client.models.generate_content_stream(
-                model=GEMINI_MODEL,
-                contents=prompt,
-            ):
-                word         = chunk.text or ""
+            for chunk in gemini_client.models.generate_content_stream(model=GEMINI_MODEL, contents=prompt):
+                word = chunk.text or ""
                 full_answer += word
                 yield sse("token", {"text": word})
-
             session["history"].append({"role": "assistant", "content": full_answer})
             yield sse("answer_done", {"full_answer": full_answer})
-
         except Exception as e:
             yield sse("error", {"message": f"Gemini error: {str(e)}"})
 
-    return Response(
-        generate(),
-        mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -477,7 +504,7 @@ def api_add_videos():
 
     session = sessions.get(session_id)
     if not session:
-        return jsonify({"error": "No active session. Please search for a topic first."}), 400
+        return jsonify({"error": "No active session."}), 400
     if not query:
         return jsonify({"error": "No query provided"}), 400
 
@@ -485,27 +512,19 @@ def api_add_videos():
 
     def generate():
         yield sse("status", {"message": f"Searching for more videos: '{query}'..."})
-
         try:
             candidates = search_youtube(query, top_n=num_videos + 3)
         except Exception as e:
-            yield sse("error", {"message": str(e)})
-            return
+            yield sse("error", {"message": str(e)}); return
 
         new_videos = [v for v in candidates if v["video_id"] not in existing_ids][:num_videos]
-
         if not new_videos:
-            yield sse("error", {"message": "No new videos found (all results already loaded)."})
-            return
+            yield sse("error", {"message": "No new videos found."}); return
 
         yield sse("videos", {"videos": new_videos})
-
         added = []
         for idx, video in enumerate(new_videos):
-            yield sse(
-                "status",
-                {"message": f"Downloading & transcribing {idx+1}/{len(new_videos)}: {video['title'][:50]}..."}
-            )
+            yield sse("status", {"message": f"Downloading & transcribing {idx+1}/{len(new_videos)}: {video['title'][:50]}..."})
             text = get_transcript_for_video(video)
             if text:
                 entry = {**video, "text": text}
@@ -516,16 +535,10 @@ def api_add_videos():
             else:
                 yield sse("transcript_error", {"video_id": video["video_id"], "title": video["title"]})
 
-        yield sse("done", {
-            "count":   len(added),
-            "message": f"Added {len(added)} new video(s) to the session.",
-        })
+        yield sse("done", {"count": len(added), "message": f"Added {len(added)} new video(s)."})
 
-    return Response(
-        generate(),
-        mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.route("/")
