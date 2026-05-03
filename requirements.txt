@@ -1,6 +1,7 @@
 flask
 flask-cors
-requests
 yt-dlp
+requests
 google-genai
 gunicorn
+youtube-transcript-api
