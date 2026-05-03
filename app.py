@@ -116,18 +116,20 @@ def download_audio(url: str) -> str | None:
     outtmpl = os.path.join(OUTPUT_DIR, f"{vid}.%(ext)s")
 
     ydl_opts = {
-        "format": "18/bestaudio/best",
-        "outtmpl": outtmpl,
-        "quiet": True,
-        "no_warnings": True,
-        "force_ipv4": True,
-        "geo_bypass": True,
-        "socket_timeout": 30,
-        "retries": 10,
-        "fragment_retries": 10,
-        "http_chunk_size": 1048576,
-        "extractor_args": {"youtube": {"player_client": ["android", "web", "ios"]}},
-    }
+    "format": "bestaudio/best",
+    "quiet": True,
+    "no_warnings": True,
+    "force_ipv4": True,
+    "geo_bypass": True,
+    "http_headers": {
+        "User-Agent": "Mozilla/5.0"
+    },
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android"]
+        }
+    },
+}
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
