@@ -11,18 +11,9 @@ from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 from google import genai
 
-# Try importing youtube_transcript_api (primary method)
-try:
-    from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
-    YT_TRANSCRIPT_AVAILABLE = True
-except ImportError:
-    YT_TRANSCRIPT_AVAILABLE = False
-
 # ── API Keys ─────────────────────────────────────────────────────────────────
-# Set these as environment variables on Render:
-# SARVAM_API_KEY, GEMINI_API_KEY
-SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "sk_ul3v")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzyDPuqRX")
+SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "sk_ul3vhkdy_fbp9YtKgM9oaoZfAy90Fpv04")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDPuqRXKICkFkKGRjk77zNtAz9tn9GDbJ8")
 
 SARVAM_URL    = "https://api.sarvam.ai/speech-to-text"
 OUTPUT_DIR    = os.path.join(os.path.dirname(__file__), "downloads")
@@ -40,7 +31,6 @@ GEMINI_MODEL  = "gemini-2.5-flash"
 app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
-# In-memory chat sessions:
 # { session_id: { "topic": str, "transcripts": [...], "history": [...] } }
 sessions = {}
 
@@ -52,10 +42,8 @@ sessions = {}
 def fmt_views(n) -> str:
     try:
         n = int(n)
-        if n >= 1_000_000:
-            return f"{n/1_000_000:.1f}M views"
-        if n >= 1_000:
-            return f"{n/1_000:.1f}K views"
+        if n >= 1_000_000: return f"{n/1_000_000:.1f}M views"
+        if n >= 1_000:     return f"{n/1_000:.1f}K views"
         return f"{n} views"
     except Exception:
         return ""
@@ -78,22 +66,20 @@ def cleanup_video_files(video_id: str) -> None:
                 continue
             seen.add(path)
             if os.path.isfile(path):
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
+                try:    os.remove(path)
+                except: pass
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# YouTube helpers
+# YouTube search
 # ══════════════════════════════════════════════════════════════════════════════
 
 def search_youtube(query: str, top_n: int = 2) -> list[dict]:
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
+        "quiet":        True,
+        "no_warnings":  True,
         "extract_flat": "in_playlist",
-        "force_ipv4": True,
+        "force_ipv4":   True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(f"ytsearch{top_n}:{query}", download=False)
@@ -115,242 +101,144 @@ def search_youtube(query: str, top_n: int = 2) -> list[dict]:
     return results
 
 
-# ── Method 1: youtube-transcript-api (fastest, no bot detection) ──────────
+# ══════════════════════════════════════════════════════════════════════════════
+# Audio download — tries multiple player clients to beat bot detection
+#
+# Why these clients?
+#   tv_embedded  — embedded TV client, almost never rate-limited on server IPs
+#   web_creator  — YouTube Studio client, different bot-check rules
+#   android      — mobile client, different token validation path
+#   ios          — Apple client, separate validation
+#
+# We try them one by one until a download succeeds.
+# ══════════════════════════════════════════════════════════════════════════════
 
-def get_transcript_via_api(video_id: str) -> str | None:
-    """
-    Fetch transcript using youtube-transcript-api.
-    Tries English first, then auto-generated, then any available language.
-    Returns plain text or None if unavailable.
-    """
-    if not YT_TRANSCRIPT_AVAILABLE:
-        return None
-
-    try:
-        # Preferred language order
-        preferred = ["en", "en-US", "en-GB", "en-IN", "hi", "te", "ta", "kn", "ml", "bn", "mr", "gu"]
-        try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        except Exception:
-            return None
-
-        transcript = None
-
-        # 1. Try manually created transcripts in preferred languages
-        for lang in preferred:
-            try:
-                transcript = transcript_list.find_manually_created_transcript([lang])
-                break
-            except Exception:
-                pass
-
-        # 2. Try auto-generated transcripts in preferred languages
-        if transcript is None:
-            for lang in preferred:
-                try:
-                    transcript = transcript_list.find_generated_transcript([lang])
-                    break
-                except Exception:
-                    pass
-
-        # 3. Fallback: take first available transcript and translate to English
-        if transcript is None:
-            try:
-                available = list(transcript_list)
-                if available:
-                    transcript = available[0]
-                    try:
-                        transcript = transcript.translate("en")
-                    except Exception:
-                        pass  # use original language
-            except Exception:
-                return None
-
-        if transcript is None:
-            return None
-
-        data  = transcript.fetch()
-        parts = [entry.get("text", "") for entry in data]
-        text  = " ".join(p.strip() for p in parts if p.strip())
-        return text if text else None
-
-    except (TranscriptsDisabled, NoTranscriptFound):
-        return None
-    except Exception:
-        return None
-
-
-# ── Method 2: yt-dlp subtitle download (VTT, no audio download) ──────────
-
-def clean_vtt(vtt: str) -> str:
-    """Strip VTT timestamps and HTML tags, deduplicate lines."""
-    lines  = vtt.split("\n")
-    seen   = set()
-    output = []
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith("WEBVTT") or line.startswith("Kind:") or line.startswith("Language:"):
-            continue
-        if "-->" in line:
-            continue
-        # Remove inline timestamp tags like <00:00:01.000>
-        line = re.sub(r"<\d+:\d+:\d+\.\d+>", "", line)
-        # Remove other HTML tags
-        line = re.sub(r"<[^>]+>", "", line).strip()
-        if line and line not in seen:
-            seen.add(line)
-            output.append(line)
-    return " ".join(output)
-
-
-def get_transcript_via_vtt(video: dict) -> str | None:
-    """
-    Download VTT subtitle file via yt-dlp (no audio, no bot issue for most videos).
-    """
-    vid      = video["video_id"]
-    outtmpl  = os.path.join(OUTPUT_DIR, f"{vid}")
-    ydl_opts = {
-        "quiet":            True,
-        "no_warnings":      True,
-        "skip_download":    True,
-        "writesubtitles":   True,
-        "writeautomaticsub": True,
-        "subtitleslangs":   ["en", "en-orig"],
-        "subtitlesformat":  "vtt",
-        "outtmpl":          outtmpl,
-        "force_ipv4":       True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video["url"]])
-    except Exception:
-        pass
-
-    # Find any .vtt file written
-    for f in glob.glob(os.path.join(OUTPUT_DIR, f"{vid}*.vtt")):
-        try:
-            with open(f, "r", encoding="utf-8") as fp:
-                raw = fp.read()
-            os.remove(f)
-            text = clean_vtt(raw)
-            if text:
-                return text
-        except Exception:
-            pass
-    return None
-
-
-# ── Method 3: Audio download + Sarvam transcription (heaviest, fallback) ─
+# Each entry is a list of player_client values to pass to extractor_args
+_PLAYER_CLIENT_ATTEMPTS = [
+    ["tv_embedded"],
+    ["web_creator"],
+    ["android"],
+    ["ios"],
+    ["web_creator", "android"],   # combo fallback
+]
 
 def download_audio(url: str) -> str | None:
     vid     = get_video_id(url)
     outtmpl = os.path.join(OUTPUT_DIR, f"{vid}.%(ext)s")
 
-    ydl_opts = {
-        "format":      "bestaudio/best",
-        "quiet":       True,
-        "no_warnings": True,
-        "force_ipv4":  True,
-        "geo_bypass":  True,
+    base_opts = {
+        "format":           "bestaudio/best",
+        "outtmpl":          outtmpl,
+        "quiet":            True,
+        "no_warnings":      True,
+        "force_ipv4":       True,
+        "geo_bypass":       True,
+        "socket_timeout":   30,
+        "retries":          5,
+        "fragment_retries": 5,
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; SM-G996B) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/89.0.4389.72 Mobile Safari/537.36"
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
         },
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "web"]
-            }
-        },
-        "outtmpl": outtmpl,
     }
 
-    for attempt in range(1, MAX_RETRIES + 1):
+    def find_downloaded() -> str | None:
+        candidates = []
+        for ext in ("mp4", "m4a", "webm", "mkv", "opus", "mp3", "ogg"):
+            candidates.extend(glob.glob(os.path.join(OUTPUT_DIR, f"{vid}*.{ext}")))
+        candidates = [p for p in candidates if not p.endswith(".wav")]
+        if candidates:
+            candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+            return candidates[0]
+        return None
+
+    for clients in _PLAYER_CLIENT_ATTEMPTS:
+        opts = {
+            **base_opts,
+            "extractor_args": {"youtube": {"player_client": clients}},
+        }
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
-
-            candidates = []
-            for ext in ("mp4", "m4a", "webm", "mkv", "opus", "mp3"):
-                candidates.extend(glob.glob(os.path.join(OUTPUT_DIR, f"{vid}*.{ext}")))
-            candidates = [p for p in candidates if not p.endswith(".wav")]
-
-            if candidates:
-                candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
-                return candidates[0]
-
+            result = find_downloaded()
+            if result:
+                return result
         except Exception:
-            if attempt < MAX_RETRIES:
-                time.sleep(attempt * 5)
+            time.sleep(2)
+            continue
 
     return None
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# WAV conversion + chunking
+# ══════════════════════════════════════════════════════════════════════════════
+
 def convert_to_wav(input_file: str) -> str | None:
-    base, _ = os.path.splitext(input_file)
+    base, _  = os.path.splitext(input_file)
     wav_file = base + "_16k.wav"
-    cmd = [
-        "ffmpeg", "-y", "-i", input_file,
-        "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav_file
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result   = subprocess.run(
+        ["ffmpeg", "-y", "-i", input_file,
+         "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav_file],
+        capture_output=True, text=True
+    )
     if result.returncode != 0 or not os.path.isfile(wav_file):
         return None
     return wav_file
 
 
 def get_duration(wav_file: str) -> float:
-    cmd = [
-        "ffprobe", "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        wav_file
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    try:
-        return float(result.stdout.strip())
-    except ValueError:
-        return 0.0
+    result = subprocess.run(
+        ["ffprobe", "-v", "error",
+         "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1",
+         wav_file],
+        capture_output=True, text=True
+    )
+    try:    return float(result.stdout.strip())
+    except: return 0.0
 
 
 def split_wav(wav_file: str) -> list[str]:
     duration = get_duration(wav_file)
-    if duration == 0:
+    if not duration:
         return [wav_file]
 
     n_chunks = math.ceil(duration / CHUNK_SECONDS)
     if n_chunks == 1:
         return [wav_file]
 
-    base, _ = os.path.splitext(wav_file)
-    chunk_paths = []
-
+    base, _      = os.path.splitext(wav_file)
+    chunk_paths  = []
     for i in range(n_chunks):
         chunk_path = f"{base}_chunk{i:03d}.wav"
-        cmd = [
-            "ffmpeg", "-y",
-            "-ss", str(i * CHUNK_SECONDS),
-            "-t", str(CHUNK_SECONDS),
-            "-i", wav_file,
-            "-ar", "16000", "-ac", "1",
-            "-c:a", "pcm_s16le",
-            chunk_path
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode == 0 and os.path.isfile(chunk_path):
+        r = subprocess.run(
+            ["ffmpeg", "-y",
+             "-ss", str(i * CHUNK_SECONDS),
+             "-t",  str(CHUNK_SECONDS),
+             "-i",  wav_file,
+             "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
+             chunk_path],
+            capture_output=True, text=True
+        )
+        if r.returncode == 0 and os.path.isfile(chunk_path):
             chunk_paths.append(chunk_path)
 
     return chunk_paths or [wav_file]
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Sarvam transcription
+# ══════════════════════════════════════════════════════════════════════════════
+
 def transcribe_chunk(audio_file: str) -> str:
-    headers = {"api-subscription-key": SARVAM_API_KEY}
     with open(audio_file, "rb") as f:
         resp = requests.post(
             SARVAM_URL,
-            headers=headers,
+            headers={"api-subscription-key": SARVAM_API_KEY},
             data={"model": "saarika:v2.5"},
             files={"file": (os.path.basename(audio_file), f, "audio/wav")},
             timeout=120,
@@ -363,7 +251,6 @@ def transcribe_chunk(audio_file: str) -> str:
 def transcribe_audio(wav_file: str) -> str:
     chunks = split_wav(wav_file)
     parts  = []
-
     for chunk in chunks:
         try:
             parts.append(transcribe_chunk(chunk))
@@ -371,75 +258,29 @@ def transcribe_audio(wav_file: str) -> str:
             parts.append("")
         finally:
             if chunk != wav_file and os.path.isfile(chunk):
-                try:
-                    os.remove(chunk)
-                except Exception:
-                    pass
-
+                try:    os.remove(chunk)
+                except: pass
     return " ".join(parts)
 
 
-def get_transcript_via_audio(video: dict) -> str | None:
-    """Full audio-download + Sarvam transcription pipeline."""
+def get_transcript_for_video(video: dict) -> str | None:
     video_id = video["video_id"]
     audio    = None
     wav      = None
-
     try:
         audio = download_audio(video["url"])
         if not audio:
             return None
-
         wav = convert_to_wav(audio)
         if not wav:
             return None
-
         return transcribe_audio(wav)
-
     finally:
-        if wav and os.path.isfile(wav):
-            try:
-                os.remove(wav)
-            except Exception:
-                pass
-        if audio and os.path.isfile(audio):
-            try:
-                os.remove(audio)
-            except Exception:
-                pass
+        for f in [wav, audio]:
+            if f and os.path.isfile(f):
+                try:    os.remove(f)
+                except: pass
         cleanup_video_files(video_id)
-
-
-# ── Master transcript fetcher (tries all methods in order) ────────────────
-
-def get_transcript_for_video(video: dict) -> tuple[str | None, str]:
-    """
-    Returns (transcript_text, method_used) where method_used is one of:
-    'api', 'vtt', 'audio', or 'none'.
-
-    Priority:
-      1. youtube-transcript-api  — fastest, no bot issues
-      2. yt-dlp VTT subtitles    — no audio needed
-      3. Audio download + Sarvam — full fallback
-    """
-    video_id = video["video_id"]
-
-    # Method 1: youtube-transcript-api
-    text = get_transcript_via_api(video_id)
-    if text:
-        return text, "api"
-
-    # Method 2: VTT subtitles via yt-dlp
-    text = get_transcript_via_vtt(video)
-    if text:
-        return text, "vtt"
-
-    # Method 3: Audio download + Sarvam ASR
-    text = get_transcript_via_audio(video)
-    if text:
-        return text, "audio"
-
-    return None, "none"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -451,7 +292,7 @@ def sse(event: str, data: dict) -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# /api/search — new topic search
+# /api/search
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/api/search", methods=["POST"])
@@ -485,27 +326,18 @@ def api_search():
         for idx, video in enumerate(videos):
             yield sse(
                 "status",
-                {"message": f"Fetching transcript {idx+1}/{len(videos)}: {video['title'][:50]}..."}
+                {"message": f"Downloading & transcribing video {idx+1}/{len(videos)}: {video['title'][:50]}..."}
             )
-
-            text, method = get_transcript_for_video(video)
-
+            text = get_transcript_for_video(video)
             if text:
                 transcripts.append({**video, "text": text})
-                yield sse("transcript_ready", {
-                    "video_id": video["video_id"],
-                    "title":    video["title"],
-                    "method":   method,
-                })
-                yield sse("transcript_text", {"video_id": video["video_id"], "text": text})
+                yield sse("transcript_ready", {"video_id": video["video_id"], "title": video["title"]})
+                yield sse("transcript_text",  {"video_id": video["video_id"], "text": text})
             else:
-                yield sse("transcript_error", {
-                    "video_id": video["video_id"],
-                    "title":    video["title"],
-                })
+                yield sse("transcript_error", {"video_id": video["video_id"], "title": video["title"]})
 
         if not transcripts:
-            yield sse("error", {"message": "Could not transcribe any videos. They may have no captions and audio download was blocked. Try a different video or topic."})
+            yield sse("error", {"message": "Could not transcribe any videos."})
             return
 
         sessions[session_id] = {
@@ -544,7 +376,7 @@ Use clear headings (##) for long responses. Be thorough and helpful.
                 model=GEMINI_MODEL,
                 contents=prompt,
             ):
-                word = chunk.text or ""
+                word         = chunk.text or ""
                 full_answer += word
                 yield sse("token", {"text": word})
 
@@ -562,7 +394,7 @@ Use clear headings (##) for long responses. Be thorough and helpful.
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# /api/followup — follow-up question (NO re-search)
+# /api/followup
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/api/followup", methods=["POST"])
@@ -633,7 +465,7 @@ Use the transcripts and conversation history. Use headings if needed.
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# /api/add_videos — add more videos to an existing session
+# /api/add_videos
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/api/add_videos", methods=["POST"])
@@ -672,24 +504,17 @@ def api_add_videos():
         for idx, video in enumerate(new_videos):
             yield sse(
                 "status",
-                {"message": f"Fetching transcript {idx+1}/{len(new_videos)}: {video['title'][:50]}..."}
+                {"message": f"Downloading & transcribing {idx+1}/{len(new_videos)}: {video['title'][:50]}..."}
             )
-            text, method = get_transcript_for_video(video)
+            text = get_transcript_for_video(video)
             if text:
                 entry = {**video, "text": text}
                 session["transcripts"].append(entry)
                 added.append(entry)
-                yield sse("transcript_ready", {
-                    "video_id": video["video_id"],
-                    "title":    video["title"],
-                    "method":   method,
-                })
-                yield sse("transcript_text", {"video_id": video["video_id"], "text": text})
+                yield sse("transcript_ready", {"video_id": video["video_id"], "title": video["title"]})
+                yield sse("transcript_text",  {"video_id": video["video_id"], "text": text})
             else:
-                yield sse("transcript_error", {
-                    "video_id": video["video_id"],
-                    "title":    video["title"],
-                })
+                yield sse("transcript_error", {"video_id": video["video_id"], "title": video["title"]})
 
         yield sse("done", {
             "count":   len(added),
@@ -702,10 +527,6 @@ def api_add_videos():
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Static
-# ══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/")
 def index():
